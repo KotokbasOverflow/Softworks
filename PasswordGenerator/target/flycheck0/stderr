@@ -1,0 +1,180 @@
+   0.105596100s  INFO prepare_target{force=false package_id=PasswordGenerator v0.1.0 (C:\Users\user\Documents\Projects\Softworks\PasswordGenerator) target="PasswordGenerator"}: cargo::core::compiler::fingerprint: fingerprint error for PasswordGenerator v0.1.0 (C:\Users\user\Documents\Projects\Softworks\PasswordGenerator)/Check { test: false }/TargetInner { name: "PasswordGenerator", doc: true, ..: with_path("C:\\Users\\user\\Documents\\Projects\\Softworks\\PasswordGenerator\\src\\main.rs", Edition2024) }
+   0.105680600s  INFO prepare_target{force=false package_id=PasswordGenerator v0.1.0 (C:\Users\user\Documents\Projects\Softworks\PasswordGenerator) target="PasswordGenerator"}: cargo::core::compiler::fingerprint:     err: failed to read `C:\Users\user\Documents\Projects\Softworks\PasswordGenerator\target\debug\.fingerprint\PasswordGenerator-8e23947b05bd1081\bin-PasswordGenerator`
+
+Caused by:
+    The system cannot find the file specified. (os error 2)
+
+Stack backtrace:
+   0: git_midx_writer_dump
+   1: git_midx_writer_dump
+   2: git_midx_writer_dump
+   3: git_midx_writer_dump
+   4: git_filter_source_repo
+   5: git_filter_source_repo
+   6: git_filter_source_repo
+   7: git_filter_source_repo
+   8: git_filter_source_repo
+   9: git_filter_source_repo
+  10: git_libgit2_prerelease
+  11: <unknown>
+  12: <unknown>
+  13: <unknown>
+  14: <unknown>
+  15: git_midx_writer_dump
+  16: git_filter_source_repo
+  17: git_midx_writer_dump
+  18: BaseThreadInitThunk
+  19: RtlUserThreadStart
+   0.148793200s  INFO prepare_target{force=false package_id=rand v0.8.8 target="rand"}: cargo::core::compiler::fingerprint: fingerprint error for rand v0.8.8/Check { test: false }/TargetInner { ..: lib_target("rand", ["lib"], "C:\\Users\\user\\.cargo\\registry\\src\\index.crates.io-1949cf8c6b5b557f\\rand-0.8.8\\src\\lib.rs", Edition2018) }
+   0.148845200s  INFO prepare_target{force=false package_id=rand v0.8.8 target="rand"}: cargo::core::compiler::fingerprint:     err: failed to read `C:\Users\user\Documents\Projects\Softworks\PasswordGenerator\target\debug\.fingerprint\rand-c706d3116a325375\lib-rand`
+
+Caused by:
+    The system cannot find the file specified. (os error 2)
+
+Stack backtrace:
+   0: git_midx_writer_dump
+   1: git_midx_writer_dump
+   2: git_midx_writer_dump
+   3: git_midx_writer_dump
+   4: git_filter_source_repo
+   5: git_filter_source_repo
+   6: git_filter_source_repo
+   7: git_filter_source_repo
+   8: git_filter_source_repo
+   9: git_filter_source_repo
+  10: git_filter_source_repo
+  11: git_libgit2_prerelease
+  12: <unknown>
+  13: <unknown>
+  14: <unknown>
+  15: <unknown>
+  16: git_midx_writer_dump
+  17: git_filter_source_repo
+  18: git_midx_writer_dump
+  19: BaseThreadInitThunk
+  20: RtlUserThreadStart
+   0.149595500s  INFO prepare_target{force=false package_id=rand_chacha v0.3.1 target="rand_chacha"}: cargo::core::compiler::fingerprint: fingerprint error for rand_chacha v0.3.1/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("rand_chacha", ["lib"], "C:\\Users\\user\\.cargo\\registry\\src\\index.crates.io-1949cf8c6b5b557f\\rand_chacha-0.3.1\\src\\lib.rs", Edition2018) }
+   0.149639700s  INFO prepare_target{force=false package_id=rand_chacha v0.3.1 target="rand_chacha"}: cargo::core::compiler::fingerprint:     err: failed to read `C:\Users\user\Documents\Projects\Softworks\PasswordGenerator\target\debug\.fingerprint\rand_chacha-a2f6cc8824eb6d9d\lib-rand_chacha`
+
+Caused by:
+    The system cannot find the file specified. (os error 2)
+
+Stack backtrace:
+   0: git_midx_writer_dump
+   1: git_midx_writer_dump
+   2: git_midx_writer_dump
+   3: git_midx_writer_dump
+   4: git_filter_source_repo
+   5: git_filter_source_repo
+   6: git_filter_source_repo
+   7: git_filter_source_repo
+   8: git_filter_source_repo
+   9: git_filter_source_repo
+  10: git_filter_source_repo
+  11: git_filter_source_repo
+  12: git_libgit2_prerelease
+  13: <unknown>
+  14: <unknown>
+  15: <unknown>
+  16: <unknown>
+  17: git_midx_writer_dump
+  18: git_filter_source_repo
+  19: git_midx_writer_dump
+  20: BaseThreadInitThunk
+  21: RtlUserThreadStart
+   0.150326300s  INFO prepare_target{force=false package_id=ppv-lite86 v0.2.21 target="ppv_lite86"}: cargo::core::compiler::fingerprint: fingerprint error for ppv-lite86 v0.2.21/Check { test: false }/TargetInner { ..: lib_target("ppv_lite86", ["lib"], "C:\\Users\\user\\.cargo\\registry\\src\\index.crates.io-1949cf8c6b5b557f\\ppv-lite86-0.2.21\\src\\lib.rs", Edition2021) }
+   0.150368300s  INFO prepare_target{force=false package_id=ppv-lite86 v0.2.21 target="ppv_lite86"}: cargo::core::compiler::fingerprint:     err: failed to read `C:\Users\user\Documents\Projects\Softworks\PasswordGenerator\target\debug\.fingerprint\ppv-lite86-cc02ee66a2c03ebe\lib-ppv_lite86`
+
+Caused by:
+    The system cannot find the file specified. (os error 2)
+
+Stack backtrace:
+   0: git_midx_writer_dump
+   1: git_midx_writer_dump
+   2: git_midx_writer_dump
+   3: git_midx_writer_dump
+   4: git_filter_source_repo
+   5: git_filter_source_repo
+   6: git_filter_source_repo
+   7: git_filter_source_repo
+   8: git_filter_source_repo
+   9: git_filter_source_repo
+  10: git_filter_source_repo
+  11: git_filter_source_repo
+  12: git_filter_source_repo
+  13: git_libgit2_prerelease
+  14: <unknown>
+  15: <unknown>
+  16: <unknown>
+  17: <unknown>
+  18: git_midx_writer_dump
+  19: git_filter_source_repo
+  20: git_midx_writer_dump
+  21: BaseThreadInitThunk
+  22: RtlUserThreadStart
+   0.151080600s  INFO prepare_target{force=false package_id=zerocopy v0.8.56 target="zerocopy"}: cargo::core::compiler::fingerprint: fingerprint error for zerocopy v0.8.56/Check { test: false }/TargetInner { ..: lib_target("zerocopy", ["lib"], "C:\\Users\\user\\.cargo\\registry\\src\\index.crates.io-1949cf8c6b5b557f\\zerocopy-0.8.56\\src\\lib.rs", Edition2021) }
+   0.151155400s  INFO prepare_target{force=false package_id=zerocopy v0.8.56 target="zerocopy"}: cargo::core::compiler::fingerprint:     err: failed to read `C:\Users\user\Documents\Projects\Softworks\PasswordGenerator\target\debug\.fingerprint\zerocopy-70c8ed40a3bd881b\lib-zerocopy`
+
+Caused by:
+    The system cannot find the file specified. (os error 2)
+
+Stack backtrace:
+   0: git_midx_writer_dump
+   1: git_midx_writer_dump
+   2: git_midx_writer_dump
+   3: git_midx_writer_dump
+   4: git_filter_source_repo
+   5: git_filter_source_repo
+   6: git_filter_source_repo
+   7: git_filter_source_repo
+   8: git_filter_source_repo
+   9: git_filter_source_repo
+  10: git_filter_source_repo
+  11: git_filter_source_repo
+  12: git_filter_source_repo
+  13: git_filter_source_repo
+  14: git_libgit2_prerelease
+  15: <unknown>
+  16: <unknown>
+  17: <unknown>
+  18: <unknown>
+  19: git_midx_writer_dump
+  20: git_filter_source_repo
+  21: git_midx_writer_dump
+  22: BaseThreadInitThunk
+  23: RtlUserThreadStart
+   0.156206100s  INFO prepare_target{force=false package_id=PasswordGenerator v0.1.0 (C:\Users\user\Documents\Projects\Softworks\PasswordGenerator) target="PasswordGenerator"}: cargo::core::compiler::fingerprint: fingerprint error for PasswordGenerator v0.1.0 (C:\Users\user\Documents\Projects\Softworks\PasswordGenerator)/Check { test: true }/TargetInner { name: "PasswordGenerator", doc: true, ..: with_path("C:\\Users\\user\\Documents\\Projects\\Softworks\\PasswordGenerator\\src\\main.rs", Edition2024) }
+   0.156255900s  INFO prepare_target{force=false package_id=PasswordGenerator v0.1.0 (C:\Users\user\Documents\Projects\Softworks\PasswordGenerator) target="PasswordGenerator"}: cargo::core::compiler::fingerprint:     err: failed to read `C:\Users\user\Documents\Projects\Softworks\PasswordGenerator\target\debug\.fingerprint\PasswordGenerator-06bd3dec61cdfbfe\test-bin-PasswordGenerator`
+
+Caused by:
+    The system cannot find the file specified. (os error 2)
+
+Stack backtrace:
+   0: git_midx_writer_dump
+   1: git_midx_writer_dump
+   2: git_midx_writer_dump
+   3: git_midx_writer_dump
+   4: git_filter_source_repo
+   5: git_filter_source_repo
+   6: git_filter_source_repo
+   7: git_filter_source_repo
+   8: git_filter_source_repo
+   9: git_filter_source_repo
+  10: git_libgit2_prerelease
+  11: <unknown>
+  12: <unknown>
+  13: <unknown>
+  14: <unknown>
+  15: git_midx_writer_dump
+  16: git_filter_source_repo
+  17: git_midx_writer_dump
+  18: BaseThreadInitThunk
+  19: RtlUserThreadStart
+    Checking zerocopy v0.8.56
+    Checking ppv-lite86 v0.2.21
+    Checking rand_chacha v0.3.1
+    Checking rand v0.8.8
+    Checking PasswordGenerator v0.1.0 (C:\Users\user\Documents\Projects\Softworks\PasswordGenerator)
+error: could not compile `PasswordGenerator` (bin "PasswordGenerator") due to 18 previous errors
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `PasswordGenerator` (bin "PasswordGenerator" test) due to 18 previous errors
