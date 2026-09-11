@@ -1,1 +1,19 @@
-PasswordGenerator/target/
+# Rust build artifacts (all crates, incl. future ones)
+/target/
+**/target/
+# Cargo lock backup / incremental leftovers
+**/*.rs.bk
+# Debug symbols / binaries accidentally placed outside target/
+*.pdb
+*.exe
+# IDE / editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+# OS
+.DS_Store
+Thumbs.db
+# rust-analyzer flycheck
+flycheck*
