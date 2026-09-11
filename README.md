@@ -1,8 +1,9 @@
 # Softworks
 
-Utility monorepo (cargo workspace, lockfile at root). First crate:
+Utility monorepo (cargo workspace, lockfile at root). Crates:
 
 - [`PasswordGenerator/`](PasswordGenerator/) — `password-generator`: CLI for passwords and EFF Diceware passphrases (Rust, CSPRNG, clipboard).
+- [`Hist/`](Hist/) — `hist`: find and redact leaked secrets in shell history (PSReadLine, bash, zsh).
 
 ```powershell
 cargo run -p password-generator -- -l 16

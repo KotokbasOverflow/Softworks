@@ -1,0 +1,4 @@
+: 1690000000:0;git status
+: 1690000001:5;curl -H 'Authorization: Bearer abcdef0123456789' https://api.example.com
+: 1690000002:0;ls -la
+: 1690000003:2;git clone https://deploy:s3cr3tpass@github.com/example/repo

@@ -1,0 +1,6 @@
+git status
+cargo test -p password-generator
+export GITHUB_TOKEN=ghp_fixturetoken1234567890
+aws s3 ls --profile default
+# AKIAIOSFODNN7EXAMPLE in a comment line
+echo "done"

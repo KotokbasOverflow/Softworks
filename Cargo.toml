@@ -1,5 +1,5 @@
 [workspace]
-members = ["PasswordGenerator"]
+members = ["PasswordGenerator", "Hist"]
 resolver = "2"
 
 [profile.release]
