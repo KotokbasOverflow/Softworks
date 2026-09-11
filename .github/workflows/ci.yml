@@ -20,40 +20,37 @@ jobs:
           components: rustfmt, clippy
       - run: cargo fmt --check
       - run: cargo clippy --all-targets -- -D warnings
-      - run: cargo test
+      - run: cargo test --workspace
       - run: cargo build --release
 
   msrv:
     # Minimum supported Rust version declared in Cargo.toml (rust-version).
     # `cargo check` (not `test`) so dev-dependencies don't raise the floor.
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: PasswordGenerator
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@1.85
       - run: cargo check --locked
 
   deny:
+    # deny.toml and Cargo.lock live at the workspace root.
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: PasswordGenerator
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
-      - run: cargo install cargo-deny --locked
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-deny
       - run: cargo deny check
 
   audit:
+    # Cargo.lock lives at the workspace root, so this runs from repo root.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - run: cargo install cargo-audit --locked
-      - run: cargo audit
-        working-directory: PasswordGenerator
+      - uses: rustsec/audit-check@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
 
   coverage:
     runs-on: ubuntu-latest
@@ -65,8 +62,10 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: llvm-tools-preview
-      - run: cargo install cargo-llvm-cov --locked
-      - run: cargo llvm-cov --workspace --lcov --output-path lcov.info
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-llvm-cov
+      - run: cargo llvm-cov --workspace --fail-under-lines 85 --lcov --output-path lcov.info
       - uses: actions/upload-artifact@v4
         with:
           name: lcov

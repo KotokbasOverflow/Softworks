@@ -15,19 +15,19 @@ ignore = []
 
 [licenses]
 # `allow` is an allowlist: anything not listed here fails the check.
+# Tight by design — add new licenses only with justification.
+# (0BSD/Unlicense appear only as dual-license alternatives today.)
 allow = [
     "MIT",
     "Apache-2.0",
     "Apache-2.0 WITH LLVM-exception",
     "BSD-2-Clause",
     "BSD-3-Clause",
-    "ISC",
-    "CC0-1.0",
-    "Unicode-DFS-2016",
-    "Unicode-3.0",
-    "MPL-2.0",
-    "Zlib",
     "BSL-1.0",
+    "Zlib",
+    "Unicode-3.0",
+    "0BSD",
+    "Unlicense",
 ]
 # EFF wordlist attribution lives in src/words.rs (CC BY, data not code).
 exceptions = []

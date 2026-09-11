@@ -13,8 +13,8 @@
 ```powershell
 cargo fmt --check
 cargo clippy --all-targets -- -D warnings
-cargo test
-cargo deny check   # requires cargo-deny
+cargo test --workspace
+cargo deny check   # from repo root (deny.toml lives there); requires cargo-deny
 cargo audit        # requires cargo-audit
 ```
 
@@ -25,9 +25,17 @@ not `test`).
 ## Wordlist
 
 `src/words.rs` embeds EFF `eff_large_wordlist.txt` verbatim. Never edit
-words by hand: any change must re-verify against upstream
-https://www.eff.org/dice, update the SHA-256 in `src/words.rs`, and make
-`tests/wordlist.rs` pass.
+words by hand — regenerate instead:
+
+```powershell
+python3 scripts/fetch_wordlist.py
+```
+
+The script downloads upstream https://www.eff.org/dice, verifies 7776
+entries, prints the SHA-256, and rewrites `src/words.rs`. If the output
+differs from the committed file, upstream changed: update the SHA-256 in
+`src/words.rs`, `tests/wordlist.rs`, and `README.md`, and call it out in
+the PR. `tests/wordlist.rs` enforces size, uniqueness, and checksum.
 
 ## Security issues
 

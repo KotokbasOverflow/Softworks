@@ -6,6 +6,23 @@ versioning follows [SemVer](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- `scripts/fetch_wordlist.py`: reproducible regeneration of `src/words.rs`
+  from upstream EFF (verified byte-identical); procedure documented in
+  `CONTRIBUTING.md`.
+- CI coverage gate (`--fail-under-lines 85`).
+
+### Changed
+- CI uses prebuilt tools (`taiki-e/install-action`, `rustsec/audit-check`)
+  instead of compiling linters on every run.
+
+### Fixed
+- Copyright holder corrected to KotokbasOverflow; `authors` added to
+  `Cargo.toml`.
+- Root workspace (`cargo run -p password-generator` works from repo root);
+  `Cargo.lock` moved to workspace root; release profile lives in the
+  workspace manifest.
+
 ## [0.2.0] — 2026-09-11
 
 ### Changed

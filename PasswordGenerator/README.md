@@ -91,8 +91,8 @@ Tests: unit + proptest in modules, `tests/cli.rs` (black-box CLI),
 ```powershell
 cargo fmt --check
 cargo clippy --all-targets -- -D warnings
-cargo test
-cargo deny check   # requires cargo-deny
+cargo test --workspace   # from repo root
+cargo deny check   # from repo root; requires cargo-deny
 cargo audit        # requires cargo-audit
 ```
 
