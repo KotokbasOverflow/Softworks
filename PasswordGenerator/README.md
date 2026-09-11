@@ -83,16 +83,33 @@ No charset flag = all four sets. `--custom` conflicts with `-a/-u/-d/-s`.
 
 ## Development
 
+Layout: `src/lib.rs` + modules (`charset`, `cli`, `password`,
+`passphrase`, `clipboard`, `words`); `src/main.rs` is a thin wrapper.
+Tests: unit + proptest in modules, `tests/cli.rs` (black-box CLI),
+`tests/wordlist.rs` (SHA-256 integrity).
+
 ```powershell
 cargo fmt --check
 cargo clippy --all-targets -- -D warnings
 cargo test
-cargo audit   # requires cargo-audit
+cargo deny check   # requires cargo-deny
+cargo audit        # requires cargo-audit
 ```
 
-Wordlist: `src/words.rs` (`EFF_WORDS`, 7776 entries).
-Source: https://www.eff.org/dice, license CC-BY / public-domain dedication
-(see EFF site for details).
+MSRV 1.85. Coverage: `cargo llvm-cov --workspace` (see CI).
+Contributing: see `CONTRIBUTING.md`; vulnerabilities: see `SECURITY.md`.
+
+Wordlist: `src/words.rs` (`EFF_WORDS`, 7776 entries, embedded verbatim in
+upstream order).
+Source: EFF `eff_large_wordlist.txt` from https://www.eff.org/dice,
+© Electronic Frontier Foundation, used under Creative Commons Attribution
+(CC BY) — see https://www.eff.org/copyright.
+Integrity: SHA-256 of the `\n`-joined list is
+`6d557f06…743bc522` (full value in `src/words.rs`, enforced by
+`tests/wordlist.rs`).
+Note: 4 words contain a hyphen (`drop-down`, `felt-tip`, `t-shirt`,
+`yo-yo`) — with the default `-` separator, split-on-`-` word counting can
+be off; use another separator if that matters.
 
 ## License
 

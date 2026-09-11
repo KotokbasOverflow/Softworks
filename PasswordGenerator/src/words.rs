@@ -1,5 +1,21 @@
-//! EFF large wordlist (7776 words).
-//! Source: https://www.eff.org/dice (CC-BY-3.0 / CC0 where applicable).
+//! EFF large wordlist for Diceware passphrases (7776 words, 6^5).
+//!
+//! Source: Electronic Frontier Foundation, "EFF's New Wordlists for Random
+//! Passphrases" — file `eff_large_wordlist.txt` from <https://www.eff.org/dice>.
+//! EFF site content (including the wordlists) is released under Creative
+//! Commons Attribution (CC BY); see <https://www.eff.org/copyright>.
+//! Words are embedded verbatim and in upstream order (verified against the
+//! file downloaded 2026-09-11).
+//!
+//! Integrity: SHA-256 over UTF-8 bytes of the words joined with `\n` plus a
+//! trailing newline must equal:
+//! `6d557f0693958fb5e650b68b5bee585eb82cf4da32965505c789e924743bc522`
+//! (see `tests/wordlist.rs`).
+//!
+//! Note: 4 of the 7776 words contain a hyphen
+//! (`drop-down`, `felt-tip`, `t-shirt`, `yo-yo`). With the default `-`
+//! separator a passphrase may therefore contain extra `-` characters;
+//! use another separator if you split on it.
 pub const EFF_WORDS: &[&str] = &[
     "abacus",
     "abdomen",

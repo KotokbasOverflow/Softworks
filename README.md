@@ -9,4 +9,5 @@ cargo run -p password-generator -- -l 16
 ```
 
 Docs and threat model live in `PasswordGenerator/README.md`.
-CI: `cargo fmt --check`, `clippy -D warnings`, `cargo test`, `cargo audit`.
+CI: `cargo fmt --check`, `clippy -D warnings`, `cargo test`, MSRV check,
+`cargo deny`, `cargo audit`, LLVM coverage.
