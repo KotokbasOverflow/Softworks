@@ -5,10 +5,11 @@
 
 pub mod clean;
 pub mod cli;
-pub mod detectors;
 pub mod finding;
 pub mod history;
 pub mod scan;
 
 pub use cli::Cli;
 pub use finding::Finding;
+// Detectors live in the shared `secdetect` crate (also used by `snip`).
+pub use secdetect::{DETECTORS, Detector, REDACTED, detect, redact};

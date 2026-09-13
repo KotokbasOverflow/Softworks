@@ -1,0 +1,14 @@
+[package]
+name = "secdetect"
+version = "0.1.0"
+edition = "2024"
+description = "Shared secret detectors for the Softworks suite (ids, regexes, redaction)"
+authors = ["KotokbasOverflow"]
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/KotokbasOverflow/Softworks"
+keywords = ["secrets", "security", "redaction"]
+categories = ["development-tools"]
+rust-version = "1.85"
+
+[dependencies]
+regex = "1"

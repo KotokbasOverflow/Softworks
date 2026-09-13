@@ -1,8 +1,8 @@
-//! Secret detectors: id, description, and regex for each known pattern.
+//! Shared secret detectors for the Softworks suite.
 //!
+//! Used by `hist` (history scanning) and `snip` (snippet redaction gate).
 //! Every match is redacted, never printed. Keep patterns tight: a false
-//! positive that nukes a history line is worse than a miss (user can add
-//! `--drop-lines` or custom patterns later).
+//! positive that nukes a history line is worse than a miss.
 
 use regex::Regex;
 use std::sync::LazyLock;
@@ -18,29 +18,29 @@ pub struct Detector {
 const PATTERNS: &[(&str, &str, &str)] = &[
     (
         "aws-access-key",
-        "AWS access key id (AKIA...)",
-        r"AKIA[0-9A-Z]{16}",
+        "AWS access key id (AKIA.../ASIA...)",
+        r"A(KIA|SIA)[0-9A-Z]{16}",
     ),
     (
         "github-token",
         "GitHub token (ghp_/gho_/github_pat_...)",
-        r"(ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]+|github_pat_[A-Za-z0-9_]+",
+        r"(ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{6,}|github_pat_[A-Za-z0-9_]{6,}",
     ),
     (
         "slack-token",
         "Slack token (xox...)",
-        r"xox[baprs]-[A-Za-z0-9-]+",
+        r"xox[baprs]-[A-Za-z0-9-]{10,}",
     ),
     (
         "stripe-secret",
-        "Stripe live secret key",
-        r"sk_live_[A-Za-z0-9]+",
+        "Stripe live/test secret key",
+        r"sk_(live|test)_[A-Za-z0-9]+",
     ),
     ("openai-key", "OpenAI API key", r"sk-[A-Za-z0-9]{20,}"),
     (
         "google-api-key",
         "Google API key (AIza...)",
-        r"AIza[0-9A-Za-z\-_]{35}",
+        r"AIza[0-9A-Za-z\-_]{35,}",
     ),
     (
         "private-key",
@@ -50,7 +50,7 @@ const PATTERNS: &[(&str, &str, &str)] = &[
     (
         "bearer-token",
         "Bearer token in Authorization header",
-        r"[Bb]earer [A-Za-z0-9\-._~+/=]{16,}",
+        r"\b[Bb]earer [A-Za-z0-9\-._~+/=]{16,}",
     ),
     (
         "url-credentials",
@@ -105,6 +105,7 @@ mod tests {
     #[test]
     fn detects_aws_key() {
         assert!(detect("aws configure AKIAIOSFODNN7EXAMPLE").contains(&"aws-access-key"));
+        assert!(detect("aws configure ASIAIOSFODNN7EXAMPLE").contains(&"aws-access-key"));
         assert!(detect("nothing here").is_empty());
     }
 
@@ -140,6 +141,21 @@ mod tests {
         assert!(!redacted.contains("AKIA"));
         assert!(redacted.contains(REDACTED));
         assert_eq!(matched.len(), 2);
+    }
+
+    #[test]
+    fn detects_stripe_variants() {
+        assert!(detect("sk_live_abc123").contains(&"stripe-secret"));
+        assert!(detect("sk_test_abc123").contains(&"stripe-secret"));
+    }
+
+    #[test]
+    fn tightened_patterns_stay_noisy_safe() {
+        // Short fragments must not match: avoids false positives.
+        assert!(!detect("ghp_x").contains(&"github-token"));
+        assert!(!detect("xoxb-1").contains(&"slack-token"));
+        // Word boundary: "SomeBearer" prefix must not trigger bearer-token.
+        assert!(!detect("SomeBearer abcdef0123456789").contains(&"bearer-token"));
     }
 
     #[test]

@@ -9,6 +9,10 @@ use crate::charset::{
 };
 use crate::cli::Cli;
 
+/// Bounds: passwords are short secrets, not documents.
+pub const MAX_PASSWORD_LEN: usize = 4096;
+pub const MAX_CUSTOM_CHARS: usize = 1024;
+
 /// Generate a password of `length` characters.
 ///
 /// When no charset flag is set, all four sets are used. Guarantees at least
@@ -27,9 +31,15 @@ pub fn generate_password(
     if length == 0 {
         bail!("Length must be positive");
     }
+    if length > MAX_PASSWORD_LEN {
+        bail!("Length exceeds {MAX_PASSWORD_LEN}");
+    }
 
     // Custom set path (Unicode-safe: work with chars, not bytes).
     if let Some(custom_chars) = custom {
+        if custom_chars.chars().count() > MAX_CUSTOM_CHARS {
+            bail!("Custom set exceeds {MAX_CUSTOM_CHARS} chars");
+        }
         let charset = unique_chars(custom_chars);
         if charset.is_empty() {
             bail!("Custom set cannot be empty");

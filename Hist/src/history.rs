@@ -54,8 +54,27 @@ pub fn command_text(shell: Shell, line: &str) -> &str {
 }
 
 fn read_lines(path: &PathBuf) -> Result<Vec<String>> {
+    // DoS guard: refuse to slurp huge history files into memory.
+    const MAX_HISTORY_BYTES: u64 = 20 * 1024 * 1024;
+    if let Ok(meta) = std::fs::metadata(path) {
+        if meta.len() > MAX_HISTORY_BYTES {
+            anyhow::bail!(
+                "history file {} is {} bytes (limit {}): pass a smaller file explicitly",
+                path.display(),
+                meta.len(),
+                MAX_HISTORY_BYTES
+            );
+        }
+    }
     let content =
         std::fs::read_to_string(path).with_context(|| format!("cannot read {}", path.display()))?;
+    if content.len() as u64 > MAX_HISTORY_BYTES {
+        anyhow::bail!(
+            "history file {} exceeds {} bytes after decoding",
+            path.display(),
+            MAX_HISTORY_BYTES
+        );
+    }
     Ok(content.lines().map(str::to_string).collect())
 }
 

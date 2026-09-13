@@ -54,7 +54,7 @@ cargo clippy --all-targets -- -D warnings
 cargo test --workspace   # from repo root
 ```
 
-Layout: `src/lib.rs` + modules (`detectors`, `history`, `scan`, `clean`, `finding`, `cli`); `src/main.rs` is a thin wrapper. Fixtures with fake secrets live in `tests/fixtures/`.
+Layout: `src/lib.rs` + modules (`history`, `scan`, `clean`, `finding`, `cli`); detectors live in the shared [`secdetect`](../Secdetect/) crate. `src/main.rs` is a thin wrapper. Fixtures with fake secrets live in `tests/fixtures/`.
 
 ## License
 

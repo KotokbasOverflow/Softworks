@@ -1,8 +1,8 @@
 //! Scan: run detectors over history files, collect [`Finding`]s.
 
-use crate::detectors::redact;
 use crate::finding::Finding;
 use crate::history::{HistoryFile, command_text};
+use secdetect::redact;
 
 /// Scan one loaded history file.
 pub fn scan_history(h: &HistoryFile) -> Vec<Finding> {

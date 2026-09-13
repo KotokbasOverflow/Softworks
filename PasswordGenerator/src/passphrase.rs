@@ -2,11 +2,16 @@
 
 use anyhow::{Result, bail};
 use rand::Rng;
+use zeroize::Zeroize;
 
 use crate::words::EFF_WORDS;
 
 // log2(7776) ~= 12.92 bits per word
 pub const BITS_PER_EFF_WORD: f64 = 12.92;
+
+/// Bounds: passphrases are short secrets, not documents.
+pub const MAX_WORDS: usize = 128;
+pub const MAX_SEPARATOR_CHARS: usize = 16;
 
 pub fn capitalize_word(w: &str) -> String {
     let mut chars = w.chars();
@@ -25,6 +30,12 @@ pub fn generate_passphrase(
     if words == 0 {
         bail!("Number of words must be positive");
     }
+    if words > MAX_WORDS {
+        bail!("Number of words exceeds {MAX_WORDS}");
+    }
+    if separator.chars().count() > MAX_SEPARATOR_CHARS {
+        bail!("Separator exceeds {MAX_SEPARATOR_CHARS} chars");
+    }
     if EFF_WORDS.is_empty() {
         bail!("Wordlist is empty");
     }
@@ -40,6 +51,10 @@ pub fn generate_passphrase(
         }
     }
     let mut out = phrase.join(separator);
+    // Wipe intermediate word copies: only the joined secret leaves this fn.
+    for w in phrase.iter_mut() {
+        w.zeroize();
+    }
     if with_number {
         let d: u8 = rng.random_range(0..10);
         out.push_str(separator);

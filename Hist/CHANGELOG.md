@@ -6,6 +6,8 @@ versioning follows [SemVer](https://semver.org/).
 
 ## [Unreleased]
 
+- Detectors extracted to shared workspace crate `secdetect` (used by `hist` and `snip`).
+
 ## [0.1.0] — 2026-09-11
 
 - Initial release: `scan`, `clean` (`--dry-run`, `--drop-lines`), `detectors`.

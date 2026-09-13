@@ -16,9 +16,9 @@ jobs:
         with:
           components: rustfmt, clippy
       - run: cargo fmt --check
-      - run: cargo clippy --workspace --all-targets -- -D warnings
-      - run: cargo test --workspace
-      - run: cargo build --workspace --release
+      - run: cargo clippy --locked --workspace --all-targets -- -D warnings
+      - run: cargo test --locked --workspace
+      - run: cargo build --locked --workspace --release
 
   msrv:
     # Minimum supported Rust version declared in Cargo.toml (rust-version).
@@ -51,9 +51,6 @@ jobs:
 
   coverage:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: PasswordGenerator
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -62,8 +59,10 @@ jobs:
       - uses: taiki-e/install-action@v2
         with:
           tool: cargo-llvm-cov
-      - run: cargo llvm-cov --workspace --fail-under-lines 85 --lcov --output-path lcov.info
+      # Exclude the embedded EFF wordlist from the line gate — it dominates LOC
+      # without exercising application logic.
+      - run: cargo llvm-cov --locked --workspace --ignore-filename-regex 'words\.rs$' --fail-under-lines 85 --lcov --output-path lcov.info
       - uses: actions/upload-artifact@v4
         with:
           name: lcov
-          path: PasswordGenerator/lcov.info
+          path: lcov.info

@@ -4,8 +4,8 @@ use anyhow::{Context, Result, bail};
 use clap::Parser;
 use std::path::{Path, PathBuf};
 
+use hist::DETECTORS;
 use hist::cli::{Cli, Commands, FormatOpt, ShellOpt};
-use hist::detectors::DETECTORS;
 use hist::history::{self, HistoryFile, Shell};
 
 fn resolve_targets(explicit: &[PathBuf], shell: Option<ShellOpt>) -> Result<Vec<HistoryFile>> {
@@ -135,6 +135,12 @@ fn main() -> Result<()> {
                     stats.lines_total,
                     stats.backup_path.display()
                 );
+                if stats.lines_changed > 0 {
+                    eprintln!(
+                        "note: the backup holds the ORIGINAL secrets — verify the result, then delete {}",
+                        stats.backup_path.display()
+                    );
+                }
                 total_changed += stats.lines_changed;
             }
             eprintln!("total changed lines: {total_changed}");

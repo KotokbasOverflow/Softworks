@@ -6,8 +6,8 @@
 use anyhow::{Context, Result};
 use std::path::{Path, PathBuf};
 
-use crate::detectors::redact;
 use crate::history::{HistoryFile, command_text};
+use secdetect::redact;
 
 pub struct CleanStats {
     pub lines_total: usize,
@@ -16,24 +16,85 @@ pub struct CleanStats {
 }
 
 fn backup_path_for(path: &Path) -> PathBuf {
+    // Nanosecond stamp + pid: two cleanups within the same second must not collide.
     let stamp = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_secs())
+        .map(|d| d.as_nanos())
         .unwrap_or(0);
     let mut name = path
         .file_name()
         .map(|s| s.to_string_lossy().into_owned())
         .unwrap_or_else(|| "history".to_string());
-    name.push_str(&format!(".histbak.{stamp}"));
+    name.push_str(&format!(".histbak.{stamp}.{}", std::process::id()));
     path.with_file_name(name)
 }
 
 /// Copy `path` to a timestamped `*.histbak.*` sibling. Returns backup path.
 pub fn backup(path: &Path) -> Result<PathBuf> {
+    // Refuse to follow symlinks: cleaning through a symlink could clobber
+    // an unexpected target, and the backup would disclose secrets elsewhere.
+    if std::fs::symlink_metadata(path)
+        .with_context(|| format!("cannot stat {}", path.display()))?
+        .file_type()
+        .is_symlink()
+    {
+        anyhow::bail!("refusing to clean symlink {}", path.display());
+    }
     let dest = backup_path_for(path);
     std::fs::copy(path, &dest)
         .with_context(|| format!("cannot back up {} to {}", path.display(), dest.display()))?;
+    restrict_backup_perms(&dest);
     Ok(dest)
+}
+
+#[cfg(unix)]
+fn restrict_backup_perms(path: &Path) {
+    use std::os::unix::fs::PermissionsExt;
+    let perm = std::fs::Permissions::from_mode(0o600);
+    if let Err(e) = std::fs::set_permissions(path, perm) {
+        eprintln!("warning: cannot chmod 0600 {}: {e:#}", path.display());
+    }
+}
+
+#[cfg(not(unix))]
+fn restrict_backup_perms(_path: &Path) {}
+
+/// Atomically replace `path` with `content` (temp file + rename in the
+/// same directory, so a crash cannot leave a half-written history).
+fn atomic_write(path: &Path, content: &str) -> Result<()> {
+    use std::io::Write as _;
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_nanos())
+        .unwrap_or(0);
+    let tmp_name = format!(
+        ".{}.tmp.{}.{}.histclean",
+        path.file_name()
+            .map(|s| s.to_string_lossy().into_owned())
+            .unwrap_or_else(|| "history".to_string()),
+        nanos,
+        std::process::id()
+    );
+    let tmp_path = path.with_file_name(tmp_name);
+    let result = (|| -> Result<()> {
+        let mut f = std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&tmp_path)
+            .with_context(|| format!("cannot create {}", tmp_path.display()))?;
+        f.write_all(content.as_bytes())
+            .context("cannot write temp history file")?;
+        f.flush().context("cannot flush temp history file")?;
+        f.sync_all().context("cannot fsync temp history file")?;
+        drop(f);
+        std::fs::rename(&tmp_path, path)
+            .with_context(|| format!("cannot replace {}", path.display()))?;
+        Ok(())
+    })();
+    if result.is_err() {
+        let _ = std::fs::remove_file(&tmp_path);
+    }
+    result
 }
 
 /// Redact (or drop) tainted lines of an already-loaded history file.
@@ -55,16 +116,18 @@ pub fn clean_history(h: &HistoryFile, drop_lines: bool) -> Result<CleanStats> {
             continue;
         }
         // Preserve the original stored format (e.g. zsh `: ts;` prefix).
-        let prefix_len = raw.len() - cmd.len();
-        out_lines.push(format!("{}{}", &raw[..prefix_len], redacted_cmd));
+        // Slicing is safe: `cmd` is a subslice of `raw`, so the prefix
+        // boundary falls on the subslice start (a valid char boundary).
+        let prefix_len = raw.len().saturating_sub(cmd.len());
+        let prefix = raw.get(..prefix_len).unwrap_or("");
+        out_lines.push(format!("{prefix}{redacted_cmd}"));
     }
 
     let mut content = out_lines.join("\n");
     if !h.lines.is_empty() {
         content.push('\n');
     }
-    std::fs::write(&h.path, content)
-        .with_context(|| format!("cannot rewrite {}", h.path.display()))?;
+    atomic_write(&h.path, &content)?;
 
     Ok(CleanStats {
         lines_total: h.lines.len(),
@@ -125,5 +188,14 @@ mod tests {
         let after = std::fs::read_to_string(&path).unwrap();
         assert!(after.starts_with(": 1690000000:0;"));
         assert!(!after.contains("hunter2"));
+    }
+
+    #[test]
+    fn backup_names_are_unique() {
+        let (_dir, path) = write_temp(&["ls"]);
+        let a = backup(&path).unwrap();
+        let b = backup(&path).unwrap();
+        assert_ne!(a, b);
+        assert!(a.is_file() && b.is_file());
     }
 }

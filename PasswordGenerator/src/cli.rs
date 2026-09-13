@@ -105,6 +105,25 @@ impl Cli {
         if self.count == 0 {
             bail!("--count must be positive");
         }
+        if self.count > 1024 {
+            bail!("--count exceeds 1024");
+        }
+        if let Some(length) = self.length {
+            if length > crate::password::MAX_PASSWORD_LEN {
+                bail!("--length exceeds {}", crate::password::MAX_PASSWORD_LEN);
+            }
+        }
+        if self.passphrase {
+            if self.words > crate::passphrase::MAX_WORDS {
+                bail!("--words exceeds {}", crate::passphrase::MAX_WORDS);
+            }
+            if self.separator.chars().count() > crate::passphrase::MAX_SEPARATOR_CHARS {
+                bail!(
+                    "--separator exceeds {} chars",
+                    crate::passphrase::MAX_SEPARATOR_CHARS
+                );
+            }
+        }
         if self.copy && self.count > 1 {
             bail!(
                 "Copying multiple passwords to clipboard is ambiguous. Use --count 1 or copy manually."
