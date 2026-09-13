@@ -11,6 +11,8 @@ categories = ["development-tools"]
 rust-version = "1.85"
 
 [dependencies]
+age = "0.12"
+anyhow = "1"
 regex = "1"
 
 [dev-dependencies]

@@ -37,6 +37,17 @@ fn run_shell(command: &str) -> Result<bool> {
     Ok(status.success())
 }
 
+/// Decrypt an age-encrypted import: identity file when `--age-identity` is
+/// given, otherwise a terminal passphrase prompt for scrypt blobs.
+fn decrypt_import(blob: &[u8], identity_path: Option<&std::path::Path>) -> Result<Vec<u8>> {
+    if identity_path.is_some() || !secdetect::age_crypt::is_passphrase_blob(blob).unwrap_or(false) {
+        return secdetect::age_crypt::decrypt_import_blob(blob, identity_path, None);
+    }
+    let passphrase = rpassword::prompt_password("age passphrase: ")
+        .context("cannot read passphrase (not a terminal?)")?;
+    secdetect::age_crypt::decrypt_import_blob(blob, None, Some(&passphrase))
+}
+
 fn main() -> Result<()> {
     let cli = Cli::parse();
     let db_path = snip::resolve_db(cli.db.as_ref())?;
@@ -168,7 +179,10 @@ fn main() -> Result<()> {
             println!("removed {name:?}");
             Ok(())
         }
-        Commands::Export { file } => {
+        Commands::Export {
+            file,
+            age_recipient,
+        } => {
             let all = store::list(&conn)?;
             let risky = all
                 .iter()
@@ -180,6 +194,28 @@ fn main() -> Result<()> {
                 );
             }
             let json = serde_json::to_string_pretty(&all)?;
+            if let Some(recipient) = age_recipient {
+                let blob = secdetect::age_crypt::encrypt_to_recipient(json.as_bytes(), &recipient)?;
+                match file {
+                    Some(p) => {
+                        std::fs::write(&p, &blob)
+                            .with_context(|| format!("cannot write {}", p.display()))?;
+                        println!(
+                            "exported {} snippet(s), age-encrypted, to {}",
+                            all.len(),
+                            p.display()
+                        );
+                    }
+                    None => {
+                        use std::io::Write as _;
+                        std::io::stdout()
+                            .lock()
+                            .write_all(&blob)
+                            .context("cannot write stdout")?;
+                    }
+                }
+                return Ok(());
+            }
             match file {
                 Some(p) => {
                     std::fs::write(&p, &json)
@@ -194,8 +230,9 @@ fn main() -> Result<()> {
             file,
             overwrite,
             force,
+            age_identity,
         } => {
-            let json = match file {
+            let raw = match file {
                 Some(p) => {
                     // DoS guard: refuse multi-hundred-MB "exports".
                     const MAX_IMPORT_BYTES: u64 = 10 * 1024 * 1024;
@@ -208,22 +245,30 @@ fn main() -> Result<()> {
                             );
                         }
                     }
-                    std::fs::read_to_string(&p)
-                        .with_context(|| format!("cannot read {}", p.display()))?
+                    std::fs::read(&p).with_context(|| format!("cannot read {}", p.display()))?
                 }
                 None => {
-                    let mut buf = String::new();
+                    let mut buf = Vec::new();
                     // Cap stdin as well (take 1 byte past the limit to detect overflow).
                     const MAX_IMPORT_BYTES: usize = 10 * 1024 * 1024;
                     io::stdin()
                         .take((MAX_IMPORT_BYTES + 1) as u64)
-                        .read_to_string(&mut buf)
+                        .read_to_end(&mut buf)
                         .context("cannot read stdin")?;
                     if buf.len() > MAX_IMPORT_BYTES {
                         bail!("import from stdin exceeds {MAX_IMPORT_BYTES} bytes");
                     }
                     buf
                 }
+            };
+            let json = if secdetect::age_crypt::is_age_blob(&raw) {
+                let plain = decrypt_import(&raw, age_identity.as_deref())?;
+                String::from_utf8(plain).context("decrypted import is not valid UTF-8")?
+            } else {
+                if age_identity.is_some() {
+                    eprintln!("note: --age-identity ignored: the import is not age-encrypted");
+                }
+                String::from_utf8(raw).context("import is not valid UTF-8")?
             };
             let items: Vec<Snippet> = serde_json::from_str(&json).context("invalid JSON export")?;
             if items.len() > 10_000 {

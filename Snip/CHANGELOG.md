@@ -12,6 +12,10 @@ versioning follows [SemVer](https://semver.org/).
 - `import` refuses inputs over 10 MiB / 10 000 items.
 - `exec` warns when the snippet looks like it contains secrets;
   `export` warns when the export contains secret-looking snippets.
+- `export --age-recipient age1...` writes an age-encrypted blob;
+  `import` auto-detects age blobs and decrypts via `--age-identity`
+  (identity files must be `0600` on unix) or a terminal passphrase prompt
+  for scrypt files.
 - `#![warn(missing_docs)]`; `cargo doc` added to CI.
 ## [0.1.0] — 2026-09-13
 

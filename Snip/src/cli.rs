@@ -88,6 +88,10 @@ pub enum Commands {
         /// Write to file instead of stdout.
         #[arg(long = "file")]
         file: Option<PathBuf>,
+        /// Encrypt the export to this age recipient (`age1...` public key)
+        /// instead of writing raw JSON.
+        #[arg(long = "age-recipient")]
+        age_recipient: Option<String>,
     },
     /// Import snippets from JSON export (skips existing names).
     ///
@@ -103,5 +107,9 @@ pub enum Commands {
         /// Store even if secrets are detected (same as `add --force`).
         #[arg(long = "force")]
         force: bool,
+        /// Identity file (`AGE-SECRET-KEY-...`) for age-encrypted imports.
+        /// Passphrase-encrypted imports prompt on the terminal instead.
+        #[arg(long = "age-identity")]
+        age_identity: Option<PathBuf>,
     },
 }

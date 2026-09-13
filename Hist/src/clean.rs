@@ -10,6 +10,7 @@ use crate::history::{HistoryFile, split_command};
 use secdetect::redact;
 
 /// Outcome of cleaning one history file.
+#[derive(Debug)]
 pub struct CleanStats {
     /// Total lines in the file.
     pub lines_total: usize,
@@ -18,6 +19,17 @@ pub struct CleanStats {
     /// Where the pre-clean copy was stored (holds original secrets).
     /// `None` with `--no-backup`.
     pub backup_path: Option<PathBuf>,
+}
+
+/// Options for [`clean_history`].
+#[derive(Debug, Default)]
+pub struct CleanOptions {
+    /// Remove whole tainted lines instead of redacting secrets.
+    pub drop_lines: bool,
+    /// Skip the `*.histbak.*` backup entirely (conflicts with `age_recipient`).
+    pub no_backup: bool,
+    /// Encrypt the backup to this age recipient (`*.histbak.*.age`).
+    pub age_recipient: Option<String>,
 }
 
 fn backup_path_for(path: &Path) -> PathBuf {
@@ -34,10 +46,9 @@ fn backup_path_for(path: &Path) -> PathBuf {
     path.with_file_name(name)
 }
 
-/// Copy `path` to a timestamped `*.histbak.*` sibling. Returns backup path.
-pub fn backup(path: &Path) -> Result<PathBuf> {
-    // Refuse to follow symlinks: cleaning through a symlink could clobber
-    // an unexpected target, and the backup would disclose secrets elsewhere.
+/// Refuse symlinks: cleaning through one could clobber an unexpected
+/// target, and the backup would disclose secrets elsewhere.
+fn ensure_not_symlink(path: &Path) -> Result<()> {
     if std::fs::symlink_metadata(path)
         .with_context(|| format!("cannot stat {}", path.display()))?
         .file_type()
@@ -45,9 +56,29 @@ pub fn backup(path: &Path) -> Result<PathBuf> {
     {
         anyhow::bail!("refusing to clean symlink {}", path.display());
     }
+    Ok(())
+}
+
+/// Copy `path` to a timestamped `*.histbak.*` sibling. Returns backup path.
+pub fn backup(path: &Path) -> Result<PathBuf> {
+    ensure_not_symlink(path)?;
     let dest = backup_path_for(path);
     std::fs::copy(path, &dest)
         .with_context(|| format!("cannot back up {} to {}", path.display(), dest.display()))?;
+    restrict_backup_perms(&dest);
+    Ok(dest)
+}
+
+/// Copy `path` to an age-encrypted `*.histbak.*.age` sibling.
+/// Returns backup path.
+pub fn backup_encrypted(path: &Path, recipient: &str) -> Result<PathBuf> {
+    ensure_not_symlink(path)?;
+    let plain = std::fs::read(path).with_context(|| format!("cannot read {}", path.display()))?;
+    let blob = secdetect::age_crypt::encrypt_to_recipient(&plain, recipient)?;
+    let mut name = backup_path_for(path).into_os_string();
+    name.push(".age");
+    let dest = PathBuf::from(name);
+    std::fs::write(&dest, &blob).with_context(|| format!("cannot write {}", dest.display()))?;
     restrict_backup_perms(&dest);
     Ok(dest)
 }
@@ -104,10 +135,16 @@ fn atomic_write(path: &Path, content: &str) -> Result<()> {
 
 /// Redact (or drop) tainted lines of an already-loaded history file.
 /// Writes the file back in its original line format (zsh metadata kept).
-/// With `no_backup` no `*.histbak.*` copy is made (cannot be undone).
-pub fn clean_history(h: &HistoryFile, drop_lines: bool, no_backup: bool) -> Result<CleanStats> {
-    let backup_path = if no_backup {
+/// With `no_backup` no `*.histbak.*` copy is made (cannot be undone);
+/// with `age_recipient` the backup is age-encrypted (`*.histbak.*.age`).
+pub fn clean_history(h: &HistoryFile, opts: &CleanOptions) -> Result<CleanStats> {
+    if opts.no_backup && opts.age_recipient.is_some() {
+        anyhow::bail!("--no-backup conflicts with --backup-age-recipient");
+    }
+    let backup_path = if opts.no_backup {
         None
+    } else if let Some(recipient) = &opts.age_recipient {
+        Some(backup_encrypted(&h.path, recipient)?)
     } else {
         Some(backup(&h.path)?)
     };
@@ -122,7 +159,7 @@ pub fn clean_history(h: &HistoryFile, drop_lines: bool, no_backup: bool) -> Resu
             continue;
         }
         changed += 1;
-        if drop_lines {
+        if opts.drop_lines {
             continue;
         }
         // Preserve the original stored format (e.g. zsh `: ts;` prefix)
@@ -163,7 +200,7 @@ mod tests {
     fn clean_redacts_and_backs_up() {
         let (_dir, path) = write_temp(&["ls", "password=hunter2", "echo ok"]);
         let h = load(Shell::Bash, &path);
-        let stats = clean_history(&h, false, false).unwrap();
+        let stats = clean_history(&h, &CleanOptions::default()).unwrap();
         assert_eq!(stats.lines_total, 3);
         assert_eq!(stats.lines_changed, 1);
         assert!(stats.backup_path.as_ref().is_some_and(|f| f.is_file()));
@@ -180,7 +217,14 @@ mod tests {
     fn clean_drop_lines_removes_tainted() {
         let (_dir, path) = write_temp(&["ls", "password=hunter2"]);
         let h = load(Shell::Bash, &path);
-        let stats = clean_history(&h, true, false).unwrap();
+        let stats = clean_history(
+            &h,
+            &CleanOptions {
+                drop_lines: true,
+                ..Default::default()
+            },
+        )
+        .unwrap();
         assert_eq!(stats.lines_changed, 1);
         let after = std::fs::read_to_string(&path).unwrap();
         assert!(!after.contains("hunter2"));
@@ -191,7 +235,7 @@ mod tests {
     fn clean_keeps_zsh_metadata() {
         let (_dir, path) = write_temp(&[": 1690000000:0;password=hunter2"]);
         let h = load(Shell::Zsh, &path);
-        clean_history(&h, false, false).unwrap();
+        clean_history(&h, &CleanOptions::default()).unwrap();
         let after = std::fs::read_to_string(&path).unwrap();
         assert!(after.starts_with(": 1690000000:0;"));
         assert!(!after.contains("hunter2"));
@@ -213,7 +257,7 @@ mod tests {
         let path = dir.path().join("h");
         std::fs::write(&path, "ls  \n  password=hunter2  ").unwrap();
         let h = load(Shell::Bash, &path);
-        clean_history(&h, false, false).unwrap();
+        clean_history(&h, &CleanOptions::default()).unwrap();
         let after = std::fs::read_to_string(&path).unwrap();
         assert_eq!(after, "ls  \n  ***REDACTED***  ");
     }
@@ -222,11 +266,66 @@ mod tests {
     fn clean_no_backup_skips_histbak() {
         let (_dir, path) = write_temp(&["ls", "password=hunter2"]);
         let h = load(Shell::Bash, &path);
-        let stats = clean_history(&h, false, true).unwrap();
+        let stats = clean_history(
+            &h,
+            &CleanOptions {
+                no_backup: true,
+                ..Default::default()
+            },
+        )
+        .unwrap();
         assert_eq!(stats.lines_changed, 1);
         assert!(stats.backup_path.is_none());
         let after = std::fs::read_to_string(&path).unwrap();
         assert!(!after.contains("hunter2"));
+    }
+
+    #[test]
+    fn clean_encrypted_backup_roundtrips() {
+        use age::secrecy::ExposeSecret;
+        let id = age::x25519::Identity::generate();
+        let recipient = id.to_public().to_string();
+        let (_dir, path) = write_temp(&["ls", "password=hunter2"]);
+        let h = load(Shell::Bash, &path);
+        let stats = clean_history(
+            &h,
+            &CleanOptions {
+                age_recipient: Some(recipient),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        let backup = stats.backup_path.expect("encrypted backup expected");
+        assert_eq!(backup.extension().and_then(|e| e.to_str()), Some("age"));
+        // No plaintext residue in the backup file.
+        let blob = std::fs::read(&backup).unwrap();
+        assert!(secdetect::age_crypt::is_age_blob(&blob));
+        assert!(!blob.windows(7).any(|w| w == b"hunter2"));
+        // ...but it decrypts back to the original.
+        let secret = id.to_string();
+        let plain =
+            secdetect::age_crypt::decrypt_with_identity(&blob, secret.expose_secret()).unwrap();
+        assert!(String::from_utf8_lossy(&plain).contains("hunter2"));
+        // Working file redacted as usual.
+        assert!(!std::fs::read_to_string(&path).unwrap().contains("hunter2"));
+    }
+
+    #[test]
+    fn clean_no_backup_conflicts_with_recipient() {
+        let (_dir, path) = write_temp(&["ls", "password=hunter2"]);
+        let h = load(Shell::Bash, &path);
+        let err = clean_history(
+            &h,
+            &CleanOptions {
+                no_backup: true,
+                age_recipient: Some(
+                    "age1ql3z7hj432v2jl2z8alunwwun8hm4s4fjljxlxeq9w3y6sms0r99t8".into(),
+                ),
+                ..Default::default()
+            },
+        )
+        .unwrap_err();
+        assert!(err.to_string().contains("conflicts"));
     }
 
     #[test]
@@ -239,7 +338,7 @@ mod tests {
             let link = dir.path().join("link");
             std::os::unix::fs::symlink(&real, &link).unwrap();
             let h = load(Shell::Bash, &link);
-            assert!(clean_history(&h, false, false).is_err());
+            assert!(clean_history(&h, &CleanOptions::default()).is_err());
             // Target untouched.
             assert!(std::fs::read_to_string(&real).unwrap().contains("hunter2"));
         }

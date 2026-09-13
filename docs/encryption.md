@@ -1,9 +1,22 @@
 # RFC: encryption at rest for Softworks
 
-Status: **proposal** (not implemented). Goal: close the main residual risk —
+Status: **v1 implemented** (opt-in flags below). Encrypted live DB stays
+deferred to v2. Goal: close the main residual risk —
 plaintext `snip` databases, `hist` backups (`*.histbak.*`) and `snip`
 exports. All encryption features are **opt-in**; plaintext stays the default
 so scripts and existing flows keep working.
+
+Implemented:
+
+- `hist clean --backup-age-recipient age1...` → `*.histbak.*.age`
+  (conflicts with `--no-backup`); wrong recipient rejected before any write.
+- `snip export --age-recipient age1...` → age blob (file or stdout).
+- `snip import` auto-detects age blobs: `--age-identity` file
+  (`AGE-SECRET-KEY-...`, `0600`-enforced on unix) or terminal passphrase
+  prompt for scrypt files; key-encrypted blobs without an identity fail
+  closed with a pointer to `--age-identity`.
+- Shared primitives live in `secdetect::age_crypt` (roundtrip + wrong-key +
+  no-residue + permission tests).
 
 ## Decision: `age` as the default primitive
 

@@ -109,6 +109,7 @@ fn main() -> Result<()> {
             dry_run,
             drop_lines,
             no_backup,
+            age_recipient,
         } => {
             let targets = resolve_targets(&history, shell)?;
             let mut total_changed = 0usize;
@@ -129,7 +130,12 @@ fn main() -> Result<()> {
                     total_changed += lines.len();
                     continue;
                 }
-                let stats = hist::clean::clean_history(t, drop_lines, no_backup)?;
+                let opts = hist::clean::CleanOptions {
+                    drop_lines,
+                    no_backup,
+                    age_recipient: age_recipient.clone(),
+                };
+                let stats = hist::clean::clean_history(t, &opts)?;
                 match &stats.backup_path {
                     Some(backup) => {
                         println!(
@@ -139,7 +145,11 @@ fn main() -> Result<()> {
                             stats.lines_total,
                             backup.display()
                         );
-                        if stats.lines_changed > 0 {
+                        if backup.extension().is_some_and(|e| e == "age") {
+                            eprintln!(
+                                "note: the backup is age-encrypted — keep the identity key or it cannot be restored"
+                            );
+                        } else if stats.lines_changed > 0 {
                             eprintln!(
                                 "note: the backup holds the ORIGINAL secrets — verify the result, then delete {}",
                                 backup.display()

@@ -5,6 +5,9 @@
 //! Every match is redacted, never printed. Keep patterns tight: a false
 //! positive that nukes a history line is worse than a miss.
 
+/// age encryption helpers (encrypted backups/exports).
+pub mod age_crypt;
+
 use regex::Regex;
 use std::sync::LazyLock;
 

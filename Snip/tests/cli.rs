@@ -172,3 +172,103 @@ fn import_rejects_oversized_file() {
         .failure()
         .stderr(predicate::str::contains("limit"));
 }
+
+fn keypair() -> (String, String) {
+    use age::secrecy::ExposeSecret;
+    let id = age::x25519::Identity::generate();
+    (
+        id.to_public().to_string(),
+        id.to_string().expose_secret().to_owned(),
+    )
+}
+
+fn write_identity(dir: &tempfile::TempDir, secret: &str) -> PathBuf {
+    let path = dir.path().join("identity.txt");
+    std::fs::write(&path, format!("# test identity\n{secret}\n")).unwrap();
+    path
+}
+
+#[test]
+fn export_encrypted_hides_plaintext_and_imports_back() {
+    let (recipient, identity) = keypair();
+    let (_dir, db) = db_dir();
+    bin()
+        .args(["--db"])
+        .arg(&db)
+        .args(["add", "deploy", "--", "ssh", "prod", "uptime"])
+        .assert()
+        .success();
+
+    let export = _dir.path().join("export.age");
+    bin()
+        .args(["--db"])
+        .arg(&db)
+        .args(["export", "--file"])
+        .arg(&export)
+        .args(["--age-recipient"])
+        .arg(&recipient)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("age-encrypted"));
+
+    // Opaque blob: no plaintext residue.
+    let blob = std::fs::read(&export).unwrap();
+    assert!(secdetect::age_crypt::is_age_blob(&blob));
+    assert!(!blob.windows(4).any(|w| w == b"prod"));
+
+    // Roundtrip into a fresh database via the identity file.
+    let (_dir2, db2) = db_dir();
+    let id_file = write_identity(&_dir2, &identity);
+    bin()
+        .args(["--db"])
+        .arg(&db2)
+        .args(["import", "--file"])
+        .arg(&export)
+        .args(["--age-identity"])
+        .arg(&id_file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("imported 1"));
+
+    bin()
+        .args(["--db"])
+        .arg(&db2)
+        .args(["get", "deploy"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("ssh prod uptime"));
+}
+
+#[test]
+fn import_encrypted_without_identity_fails_cleanly() {
+    let (recipient, _) = keypair();
+    let (_dir, db) = db_dir();
+    bin()
+        .args(["--db"])
+        .arg(&db)
+        .args(["add", "x", "--", "echo", "hi"])
+        .assert()
+        .success();
+
+    let export = _dir.path().join("export.age");
+    bin()
+        .args(["--db"])
+        .arg(&db)
+        .args(["export", "--file"])
+        .arg(&export)
+        .args(["--age-recipient"])
+        .arg(&recipient)
+        .assert()
+        .success();
+
+    // Key-encrypted blob, no identity: hard error, nothing imported.
+    let (_dir2, db2) = db_dir();
+    bin()
+        .args(["--db"])
+        .arg(&db2)
+        .args(["import", "--file"])
+        .arg(&export)
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("--age-identity"));
+}

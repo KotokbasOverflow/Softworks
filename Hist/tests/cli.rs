@@ -161,6 +161,63 @@ fn clean_no_backup_leaves_single_file() {
 }
 
 #[test]
+fn clean_encrypted_backup_hides_plaintext() {
+    use age::secrecy::ExposeSecret;
+    let id = age::x25519::Identity::generate();
+    let recipient = id.to_public().to_string();
+
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("h.history");
+    std::fs::write(&path, "ls\npassword=hunter2\n").unwrap();
+
+    bin()
+        .args(["clean", "--history"])
+        .arg(&path)
+        .args(["--backup-age-recipient"])
+        .arg(&recipient)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("backup at"));
+
+    // Exactly one new file, with .age suffix and no plaintext secret.
+    let entries: Vec<_> = std::fs::read_dir(dir.path()).unwrap().collect();
+    assert_eq!(entries.len(), 2);
+    let backup = entries
+        .iter()
+        .map(|e| e.as_ref().unwrap().path())
+        .find(|p| p != &path)
+        .unwrap();
+    assert_eq!(backup.extension().and_then(|e| e.to_str()), Some("age"));
+    let blob = std::fs::read(&backup).unwrap();
+    assert!(!blob.windows(7).any(|w| w == b"hunter2"));
+    // ...decryptable with the matching identity.
+    let secret = id.to_string();
+    let plain = secdetect::age_crypt::decrypt_with_identity(&blob, secret.expose_secret()).unwrap();
+    assert!(String::from_utf8_lossy(&plain).contains("hunter2"));
+    // Working file redacted.
+    assert!(!std::fs::read_to_string(&path).unwrap().contains("hunter2"));
+}
+
+#[test]
+fn clean_no_backup_and_recipient_conflict() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("h.history");
+    std::fs::write(&path, "ls\npassword=hunter2\n").unwrap();
+    bin()
+        .args(["clean", "--history"])
+        .arg(&path)
+        .args([
+            "--no-backup",
+            "--backup-age-recipient",
+            "age1ql3z7hj432v2jl2z8alunwwun8hm4s4fjljxlxeq9w3y6sms0r99t8",
+        ])
+        .assert()
+        .failure()
+        .code(2)
+        .stderr(predicate::str::contains("cannot be used with"));
+}
+
+#[test]
 fn clean_missing_file_fails() {
     bin()
         .args(["scan", "--history", "no-such-file.history"])

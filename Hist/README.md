@@ -36,6 +36,9 @@ hist clean --drop-lines
 # redact without leaving a plaintext backup (cannot be undone)
 hist clean --no-backup
 
+# age-encrypted backup instead of plaintext (*.histbak.*.age)
+hist clean --backup-age-recipient age1...
+
 # list detectors
 hist detectors
 ```

@@ -13,6 +13,8 @@ versioning follows [SemVer](https://semver.org/).
   on unix, and symlinks are refused.
 - History files over 20 MiB are refused (DoS guard).
 - New `--no-backup` flag: redact without leaving a plaintext `*.histbak.*`.
+- New `--backup-age-recipient age1...`: age-encrypted backup
+  (`*.histbak.*.age`) instead of plaintext; conflicts with `--no-backup`.
 - `clean` warns that the backup holds the original secrets.
 - `clean --dry-run` counting locked to distinct lines (one finding per line).
 - `#![warn(missing_docs)]`; `cargo doc` added to CI.

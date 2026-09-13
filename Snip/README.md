@@ -29,7 +29,9 @@ snip exec prune                 # prompts
 snip exec prune --yes
 snip exec prune --dry-run
 snip export --file snips.json   # plaintext commands
+snip export --file snips.age --age-recipient age1...   # age-encrypted
 snip import --file snips.json   # gated like add
+snip import --file snips.age --age-identity key.txt    # age-decrypted
 snip import --force --file snips.json
 snip rm prune --yes
 ```
@@ -37,7 +39,8 @@ snip rm prune --yes
 ## Safety notes
 
 - The gate is best-effort (same conservative patterns as `hist`). Absence of a refusal is not proof the command is safe.
-- `export` / `get` intentionally return raw text so you can eval or migrate; do not commit export files.
+- `export` / `get` intentionally return raw text so you can eval or migrate; do not commit export files. `export --age-recipient age1...` writes an age-encrypted blob instead; `import` auto-detects it and needs `--age-identity` (or a terminal passphrase for scrypt files).
+- Identity files must be `0600` (refused when group/other-readable on unix). Lost passphrase/identity = lost export: no recovery, by design.
 - `exec` runs arbitrary shell code from the DB — review snippets, prefer `--dry-run`, avoid casual `--yes`.
 
 ## Development

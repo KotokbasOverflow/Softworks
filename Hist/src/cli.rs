@@ -54,10 +54,14 @@ pub enum Commands {
 
         /// Skip the `*.histbak.*` backup (no plaintext copy of the secrets
         /// is left behind, but the clean cannot be undone).
-        #[arg(long = "no-backup")]
+        #[arg(long = "no-backup", conflicts_with = "age_recipient")]
         no_backup: bool,
+
+        /// Encrypt the backup to this age recipient (`*.histbak.*.age`
+        /// instead of plaintext). Pass an `age1...` public key.
+        #[arg(long = "backup-age-recipient", conflicts_with = "no_backup")]
+        age_recipient: Option<String>,
     },
-    /// List built-in secret detectors.
     /// List built-in secret detectors.
     Detectors,
 }

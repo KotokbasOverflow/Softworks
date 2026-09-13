@@ -1,11 +1,13 @@
 # secdetect
 
-Shared secret detectors and redaction for the Softworks suite.
+Shared secret detectors, redaction, and age-encryption helpers for the
+Softworks suite.
 
 Used by:
 
-- [`hist`](../Hist/) — scan/clean shell history
+- [`hist`](../Hist/) — scan/clean shell history (incl. age-encrypted backups)
 - [`snip`](../Snip/) — refuse to store (or import) commands containing secrets
+  (incl. age-encrypted export/import)
 
 Library only (no binary). Patterns are deliberately conservative: a false
 positive that nukes a history line is worse than a miss.

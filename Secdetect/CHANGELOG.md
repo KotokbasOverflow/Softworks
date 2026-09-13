@@ -12,7 +12,12 @@ versioning follows [SemVer](https://semver.org/).
 - Exemplar + proptest coverage: every detector id has fake-secret exemplars
   asserting detect/redact/fixpoint, plus `prop_redact_never_leaks`
   (redaction in random context never leaks, `proptest` dev-dependency).
+- New `age_crypt` module: age-encryption helpers shared by `hist`
+  (encrypted backups) and `snip` (encrypted export/import) — recipient and
+  passphrase roundtrips, blob auto-detection, permission-checked identity
+  files (`age` + `anyhow` dependencies).
 - `#![warn(missing_docs)]`.
+
 ## [0.1.0] — 2026-09-13
 
 - Initial library release: shared detectors + `detect` / `redact` for Softworks.
