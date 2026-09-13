@@ -108,38 +108,52 @@ fn main() -> Result<()> {
             shell,
             dry_run,
             drop_lines,
+            no_backup,
         } => {
             let targets = resolve_targets(&history, shell)?;
             let mut total_changed = 0usize;
             for t in &targets {
                 if dry_run {
                     let findings = hist::scan::scan_history(t);
+                    // One finding per tainted line (detector ids ride along
+                    // inside it), so distinct lines == findings; count lines
+                    // explicitly to stay in sync with `clean_history`.
+                    let lines: std::collections::HashSet<_> =
+                        findings.iter().map(|f| f.line_no).collect();
                     println!(
                         "{}: {} line(s) would change ({} finding(s))",
                         t.path.display(),
-                        findings
-                            .iter()
-                            .map(|f| f.line_no)
-                            .collect::<std::collections::HashSet<_>>()
-                            .len(),
+                        lines.len(),
                         findings.len()
                     );
-                    total_changed += findings.len();
+                    total_changed += lines.len();
                     continue;
                 }
-                let stats = hist::clean::clean_history(t, drop_lines)?;
-                println!(
-                    "{}: {}/{} lines changed, backup at {}",
-                    t.path.display(),
-                    stats.lines_changed,
-                    stats.lines_total,
-                    stats.backup_path.display()
-                );
-                if stats.lines_changed > 0 {
-                    eprintln!(
-                        "note: the backup holds the ORIGINAL secrets — verify the result, then delete {}",
-                        stats.backup_path.display()
-                    );
+                let stats = hist::clean::clean_history(t, drop_lines, no_backup)?;
+                match &stats.backup_path {
+                    Some(backup) => {
+                        println!(
+                            "{}: {}/{} lines changed, backup at {}",
+                            t.path.display(),
+                            stats.lines_changed,
+                            stats.lines_total,
+                            backup.display()
+                        );
+                        if stats.lines_changed > 0 {
+                            eprintln!(
+                                "note: the backup holds the ORIGINAL secrets — verify the result, then delete {}",
+                                backup.display()
+                            );
+                        }
+                    }
+                    None => {
+                        println!(
+                            "{}: {}/{} lines changed, no backup (--no-backup)",
+                            t.path.display(),
+                            stats.lines_changed,
+                            stats.lines_total
+                        );
+                    }
                 }
                 total_changed += stats.lines_changed;
             }

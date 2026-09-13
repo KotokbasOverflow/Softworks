@@ -15,5 +15,7 @@ cargo test --workspace
 ```
 
 Docs and threat models live in each crate's `README.md` / `SECURITY.md`.
-CI: `cargo fmt --check`, `clippy -D warnings`, `cargo test --locked`, MSRV check,
+Workspace security policy: [`SECURITY.md`](SECURITY.md). Encryption-at-rest
+proposal: [`docs/encryption.md`](docs/encryption.md).
+CI: `cargo fmt --check`, `clippy -D warnings`, `cargo doc`, `cargo test --locked`, MSRV check,
 `cargo deny`, `cargo audit`, LLVM coverage (wordlist excluded from the line gate).

@@ -120,6 +120,47 @@ fn clean_redacts_and_backs_up() {
 }
 
 #[test]
+fn clean_dry_run_counts_lines_not_findings() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("h.history");
+    // One line, two detectors (password-assign + aws-access-key) — still a
+    // single finding, matching `clean_history`'s `lines_changed`.
+    std::fs::write(&path, "ls\npassword=hunter2 AKIAIOSFODNN7EXAMPLE\n").unwrap();
+
+    bin()
+        .args(["clean", "--history"])
+        .arg(&path)
+        .arg("--dry-run")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "1 line(s) would change (1 finding(s))",
+        ));
+
+    // File untouched, no backup created.
+    assert!(std::fs::read_to_string(&path).unwrap().contains("hunter2"));
+    assert_eq!(std::fs::read_dir(dir.path()).unwrap().count(), 1);
+}
+
+#[test]
+fn clean_no_backup_leaves_single_file() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("h.history");
+    std::fs::write(&path, "ls\npassword=hunter2\n").unwrap();
+
+    bin()
+        .args(["clean", "--history"])
+        .arg(&path)
+        .arg("--no-backup")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("no backup (--no-backup)"));
+
+    assert!(!std::fs::read_to_string(&path).unwrap().contains("hunter2"));
+    assert_eq!(std::fs::read_dir(dir.path()).unwrap().count(), 1);
+}
+
+#[test]
 fn clean_missing_file_fails() {
     bin()
         .args(["scan", "--history", "no-such-file.history"])

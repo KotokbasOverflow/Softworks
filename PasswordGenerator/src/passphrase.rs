@@ -7,12 +7,15 @@ use zeroize::Zeroize;
 use crate::words::EFF_WORDS;
 
 // log2(7776) ~= 12.92 bits per word
+/// Entropy per EFF word in bits (log2(7776)).
 pub const BITS_PER_EFF_WORD: f64 = 12.92;
 
 /// Bounds: passphrases are short secrets, not documents.
 pub const MAX_WORDS: usize = 128;
+/// Maximum separator length in chars.
 pub const MAX_SEPARATOR_CHARS: usize = 16;
 
+/// Capitalize the first character of a word (Unicode-aware).
 pub fn capitalize_word(w: &str) -> String {
     let mut chars = w.chars();
     match chars.next() {
@@ -21,6 +24,8 @@ pub fn capitalize_word(w: &str) -> String {
     }
 }
 
+/// Generate a Diceware passphrase of `words` EFF words joined by
+/// `separator`. Intermediate word copies are wiped before returning.
 pub fn generate_passphrase(
     words: usize,
     separator: &str,
@@ -63,6 +68,7 @@ pub fn generate_passphrase(
     Ok(out)
 }
 
+/// Estimated passphrase entropy in bits (`words × 12.92`, plus a digit).
 pub fn passphrase_entropy_bits(words: usize, with_number: bool) -> f64 {
     let mut bits = words as f64 * BITS_PER_EFF_WORD;
     if with_number {

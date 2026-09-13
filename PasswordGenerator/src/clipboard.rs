@@ -3,6 +3,7 @@
 use anyhow::{Context, Result};
 use arboard::Clipboard;
 
+/// Copy `text` to the OS clipboard.
 pub fn copy_to_clipboard(text: &str) -> Result<()> {
     let mut clipboard = Clipboard::new().context("Failed to access clipboard")?;
     clipboard
@@ -11,6 +12,8 @@ pub fn copy_to_clipboard(text: &str) -> Result<()> {
     Ok(())
 }
 
+/// Clear the OS clipboard (writes an empty string; platform clipboard
+/// history, if any, is out of scope — see `SECURITY.md`).
 pub fn clear_clipboard() -> Result<()> {
     let mut clipboard = Clipboard::new().context("Failed to access clipboard")?;
     clipboard

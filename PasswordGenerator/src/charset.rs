@@ -4,14 +4,22 @@
 //! quotes, backticks, backslash, …) for readability and shell safety.
 //! The `ALL_*` variants cover the full printable ASCII ranges.
 
+/// Lowercase letters without ambiguous `l`.
 pub const LOWER: &str = "abcdefghijkmnopqrstuvwxyz";
+/// Uppercase letters without ambiguous `I`/`O`.
 pub const UPPER: &str = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+/// Digits without ambiguous `0`/`1`.
 pub const DIGITS: &str = "23456789";
+/// Shell-friendlier symbol subset (no quotes, backtick, backslash, `|`).
 pub const SYMBOLS: &str = "!@#$%^&*()-_=+[]{};:,.<>?/~";
 
+/// Full lowercase ASCII range (ambiguous included).
 pub const ALL_LOWER: &str = "abcdefghijklmnopqrstuvwxyz";
+/// Full uppercase ASCII range (ambiguous included).
 pub const ALL_UPPER: &str = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+/// Full digit range (ambiguous included).
 pub const ALL_DIGITS: &str = "0123456789";
+/// Full printable-ASCII symbol range (ambiguous included).
 pub const ALL_SYMBOLS: &str = "!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~";
 
 /// Deduplicate a string into its unique characters, preserving order.

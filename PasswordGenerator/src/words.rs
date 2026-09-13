@@ -16,6 +16,7 @@
 //! (`drop-down`, `felt-tip`, `t-shirt`, `yo-yo`). With the default `-`
 //! separator a passphrase may therefore contain extra `-` characters;
 //! use another separator if you split on it.
+/// Embedded EFF large wordlist (7776 words, upstream order, verbatim).
 pub const EFF_WORDS: &[&str] = &[
     "abacus",
     "abdomen",

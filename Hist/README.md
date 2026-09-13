@@ -33,6 +33,9 @@ hist clean
 # back up + drop whole tainted lines
 hist clean --drop-lines
 
+# redact without leaving a plaintext backup (cannot be undone)
+hist clean --no-backup
+
 # list detectors
 hist detectors
 ```
@@ -41,7 +44,10 @@ Exit codes: `0` clean / nothing to do, `1` findings (scan) or runtime error.
 
 ## Safety notes
 
-- `clean` always writes a timestamped backup next to the original — restore manually if a false positive eats a line.
+- `clean` writes a timestamped backup next to the original (restore manually
+  if a false positive eats a line), rewrites the file atomically, and keeps
+  whitespace/line-ending style. `--no-backup` skips the backup entirely.
+  Symlinks are refused; history files over 20 MiB are refused.
 - Patterns are deliberately conservative (`--api-key VALUE` with a space is *not* flagged; `=`/`:` assignments are). A missed secret is cheaper than a nuked history.
 - Findings print detector ids and redacted previews only. The backup file **does** contain the original secrets — delete old `*.histbak.*` files or store them securely.
 - Close the shell before cleaning: shells may rewrite history on exit and resurrect redacted lines. Best order: `hist clean` → close shell.

@@ -41,6 +41,7 @@ mod tests {
             shell,
             path: PathBuf::from("test.history"),
             lines: lines.iter().map(|s| s.to_string()).collect(),
+            trailing_newline: true,
         }
     }
 

@@ -1,3 +1,4 @@
+#![warn(missing_docs)]
 //! `password-generator` library: secure passwords and EFF Diceware passphrases.
 //!
 //! The binary (`src/main.rs`) is a thin CLI wrapper; all generation logic

@@ -1,7 +1,7 @@
 //! Subsequence fuzzy matching with a cheap relevance score.
 //!
 //! Higher is better. Name matches outrank command matches via caller-supplied
-//! field weights — see [`score_snippet`].
+//! field weights — see [`search`](crate::search).
 
 /// Score `query` against `target` (both matched case-insensitively).
 /// Returns `None` when the query is not a subsequence of the target.

@@ -11,6 +11,7 @@ use crate::cli::Cli;
 
 /// Bounds: passwords are short secrets, not documents.
 pub const MAX_PASSWORD_LEN: usize = 4096;
+/// Maximum custom-charset size in chars.
 pub const MAX_CUSTOM_CHARS: usize = 1024;
 
 /// Generate a password of `length` characters.

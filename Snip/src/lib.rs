@@ -1,3 +1,4 @@
+#![warn(missing_docs)]
 //! `snip` library: snippet store, fuzzy search, redaction gate.
 //!
 //! The binary (`src/main.rs`) is a thin CLI wrapper; all logic lives here
@@ -15,6 +16,7 @@ use anyhow::{Context, Result};
 use std::path::PathBuf;
 
 /// Resolve the database path: `--db` > `$SNIP_DB` > `~/.snip/snips.db`.
+/// Fails when no home directory can be located and no override is given.
 pub fn resolve_db(explicit: Option<&PathBuf>) -> Result<PathBuf> {
     if let Some(p) = explicit {
         return Ok(p.clone());
@@ -30,6 +32,7 @@ pub fn resolve_db(explicit: Option<&PathBuf>) -> Result<PathBuf> {
 }
 
 /// Ranked fuzzy search over name (×3), tags (×2), command and description.
+/// Name matches get a fixed bump; ties break by `use_count`.
 pub fn search<'a>(snips: &'a [Snippet], query: &str, limit: usize) -> Vec<(&'a Snippet, i64)> {
     let mut scored: Vec<(&Snippet, i64)> = snips
         .iter()

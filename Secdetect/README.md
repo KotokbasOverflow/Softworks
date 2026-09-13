@@ -16,7 +16,7 @@ positive that nukes a history line is worse than a miss.
 use secdetect::{detect, redact, DETECTORS, REDACTED};
 
 let ids = detect("password=hunter2");
-let (line, matched) = redact("export TOKEN=ghp_abc");
+let (line, matched) = redact("export TOKEN=ghp_abcDEF123456");
 assert!(line.contains(REDACTED));
 assert!(!DETECTORS.is_empty());
 ```

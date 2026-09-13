@@ -6,6 +6,13 @@ versioning follows [SemVer](https://semver.org/).
 
 ## [Unreleased]
 
+- SQLite file restricted to `0600` on unix (best-effort); snippet field
+  bounds validated on `add`/`import` (name 128, command 64K, description 8K,
+  tags 32×64).
+- `import` refuses inputs over 10 MiB / 10 000 items.
+- `exec` warns when the snippet looks like it contains secrets;
+  `export` warns when the export contains secret-looking snippets.
+- `#![warn(missing_docs)]`; `cargo doc` added to CI.
 ## [0.1.0] — 2026-09-13
 
 - Initial release: `init`, `add`, `get`, `list`, `search`, `exec`, `rm`,

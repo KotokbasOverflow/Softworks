@@ -6,16 +6,25 @@ use serde::{Deserialize, Serialize};
 use std::path::Path;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// A stored shell snippet.
 pub struct Snippet {
+    /// Unique snippet name (lookup key).
     pub name: String,
+    /// Raw shell command (may contain secrets when stored with `--force`).
     pub command: String,
+    /// Short human description.
     pub description: String,
+    /// Tags for search and grouping.
     pub tags: Vec<String>,
+    /// Creation time (unix seconds).
     pub created_at: i64,
+    /// Last update time (unix seconds).
     pub updated_at: i64,
+    /// Successful `exec` runs.
     pub use_count: i64,
 }
 
+/// Current unix time in seconds (0 on clock error).
 pub fn now_unix() -> i64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -34,6 +43,8 @@ fn tags_from_str(s: &str) -> Vec<String> {
     s.split(',').map(|t| t.trim().to_string()).collect()
 }
 
+/// Open (creating parent dirs and schema as needed) the SQLite store.
+/// Best-effort restricts the DB file to `0600` on unix.
 pub fn open(db_path: &Path) -> Result<Connection> {
     // No let-chains: keep MSRV 1.85.
     if let Some(parent) = db_path.parent() {
@@ -73,10 +84,15 @@ fn restrict_db_perms(path: &Path) {
 fn restrict_db_perms(_path: &Path) {}
 
 /// Bounds for stored snippets (DoS guard for `add`/`import`).
+/// Maximum snippet name length in chars.
 pub const MAX_NAME_CHARS: usize = 128;
+/// Maximum command length in chars.
 pub const MAX_COMMAND_CHARS: usize = 64 * 1024;
+/// Maximum description length in chars.
 pub const MAX_DESC_CHARS: usize = 8 * 1024;
+/// Maximum number of tags per snippet.
 pub const MAX_TAGS: usize = 32;
+/// Maximum single tag length in chars.
 pub const MAX_TAG_CHARS: usize = 64;
 
 fn validate(snippet: &Snippet) -> Result<()> {
@@ -108,6 +124,7 @@ fn validate(snippet: &Snippet) -> Result<()> {
     Ok(())
 }
 
+/// Insert a snippet; fails on duplicate names and oversized fields.
 pub fn add(conn: &Connection, snip: &Snippet) -> Result<()> {
     validate(snip)?;
     let exists: bool = conn
@@ -136,6 +153,7 @@ pub fn add(conn: &Connection, snip: &Snippet) -> Result<()> {
     Ok(())
 }
 
+/// Fetch a snippet by name (`None` when missing).
 pub fn get(conn: &Connection, name: &str) -> Result<Option<Snippet>> {
     let mut stmt = conn
         .prepare("SELECT name, command, description, tags, created_at, updated_at, use_count FROM snips WHERE name = ?1")
@@ -147,6 +165,7 @@ pub fn get(conn: &Connection, name: &str) -> Result<Option<Snippet>> {
     }
 }
 
+/// List all snippets ordered by name.
 pub fn list(conn: &Connection) -> Result<Vec<Snippet>> {
     let mut stmt = conn
         .prepare("SELECT name, command, description, tags, created_at, updated_at, use_count FROM snips ORDER BY name")
@@ -156,6 +175,7 @@ pub fn list(conn: &Connection) -> Result<Vec<Snippet>> {
         .context("cannot read rows")
 }
 
+/// Delete a snippet by name; returns whether anything was removed.
 pub fn remove(conn: &Connection, name: &str) -> Result<bool> {
     let n = conn
         .execute("DELETE FROM snips WHERE name = ?1", params![name])
@@ -163,6 +183,7 @@ pub fn remove(conn: &Connection, name: &str) -> Result<bool> {
     Ok(n > 0)
 }
 
+/// Increment the successful-run counter of a snippet.
 pub fn bump_use_count(conn: &Connection, name: &str) -> Result<()> {
     conn.execute(
         "UPDATE snips SET use_count = use_count + 1 WHERE name = ?1",

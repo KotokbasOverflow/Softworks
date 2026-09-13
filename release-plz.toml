@@ -1,0 +1,14 @@
+# release-plz configuration (https://release-plz.dev).
+#
+# Automation is manual for now: run the `release` workflow via
+# "Run workflow" in the Actions tab. It needs a `CARGO_REGISTRY_TOKEN`
+# secret (crates.io API token with publish scope) before publishing works;
+# release-PR creation only needs `GITHUB_TOKEN`.
+# Switch `.github/workflows/release.yml` to `push: branches: [main]` once
+# the token is in place.
+
+[workspace]
+# Tag per crate (v0.1.0 style is shared; crates publish independently).
+git_release_enable = true
+# Open one "chore: release" PR instead of pushing straight to main.
+release_always = false

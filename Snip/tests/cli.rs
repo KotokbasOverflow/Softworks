@@ -135,3 +135,40 @@ fn exec_dry_run_prints_without_running() {
         .success()
         .stdout(predicate::str::contains("echo hello"));
 }
+
+#[test]
+fn exec_warns_on_forced_secret() {
+    let (_dir, db) = db_dir();
+    bin()
+        .args(["--db"])
+        .arg(&db)
+        .args(["add", "leak", "--force", "--", "echo", "password=hunter2"])
+        .assert()
+        .success();
+
+    bin()
+        .args(["--db"])
+        .arg(&db)
+        .args(["exec", "leak", "--yes"])
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("looks like it contains secret"))
+        .stderr(predicate::str::contains("password-assign"));
+}
+
+#[test]
+fn import_rejects_oversized_file() {
+    let (_dir, db) = db_dir();
+    let export = _dir.path().join("big.json");
+    // 11 MiB of filler: the size guard fires before JSON parsing.
+    std::fs::write(&export, "x".repeat(11 * 1024 * 1024)).unwrap();
+
+    bin()
+        .args(["--db"])
+        .arg(&db)
+        .args(["import", "--file"])
+        .arg(&export)
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("limit"));
+}

@@ -6,6 +6,12 @@ versioning follows [SemVer](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+- Passphrase intermediates wiped: word copies are zeroized after joining,
+  only the joined secret leaves `generate_passphrase`.
+- DoS bounds: `--length` ≤ 4096, `--custom` ≤ 1024 chars, `--count` ≤ 1024,
+  `--words` ≤ 128, `--separator` ≤ 16 chars (enforced in `validate()` and
+  the generators).
 ### Added
 - `scripts/fetch_wordlist.py`: reproducible regeneration of `src/words.rs`
   from upstream EFF (verified byte-identical); procedure documented in

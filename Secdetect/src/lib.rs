@@ -1,3 +1,4 @@
+#![warn(missing_docs)]
 //! Shared secret detectors for the Softworks suite.
 //!
 //! Used by `hist` (history scanning) and `snip` (snippet redaction gate).
@@ -7,11 +8,16 @@
 use regex::Regex;
 use std::sync::LazyLock;
 
+/// Replacement marker substituted for every detected secret.
 pub const REDACTED: &str = "***REDACTED***";
 
+/// A named secret detector: stable id, human description, match pattern.
 pub struct Detector {
+    /// Stable machine-readable id (e.g. `"aws-access-key"`).
     pub id: &'static str,
+    /// Human-readable description shown by `hist detectors`.
     pub description: &'static str,
+    /// Compiled match pattern.
     pub pattern: Regex,
 }
 
@@ -64,6 +70,7 @@ const PATTERNS: &[(&str, &str, &str)] = &[
     ),
 ];
 
+/// All built-in detectors, compiled once. Order defines redaction order.
 pub static DETECTORS: LazyLock<Vec<Detector>> = LazyLock::new(|| {
     PATTERNS
         .iter()
@@ -163,5 +170,86 @@ mod tests {
         // Smoke: every detector matches at least its own doc example.
         assert!(!DETECTORS.is_empty());
         assert!(DETECTORS.iter().all(|d| !d.description.is_empty()));
+    }
+
+    /// Canonical secret exemplar per detector id (fake values only).
+    fn exemplars() -> Vec<(&'static str, &'static str)> {
+        vec![
+            ("aws-access-key", "AKIAIOSFODNN7EXAMPLE"),
+            ("aws-access-key", "ASIAIOSFODNN7EXAMPLE"),
+            ("github-token", "ghp_abcDEF1234567890"),
+            ("github-token", "github_pat_abcDEF1234567890_xyz"),
+            ("slack-token", "xoxb-1234567890-abcdefghij"),
+            ("stripe-secret", "sk_live_abcDEF123456"),
+            ("stripe-secret", "sk_test_abcDEF123456"),
+            ("openai-key", "sk-abcDEF1234567890abcd"),
+            // 40 chars after AIza (detector needs 35+).
+            (
+                "google-api-key",
+                "AIzaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            ),
+            ("private-key", "-----BEGIN RSA PRIVATE KEY-----"),
+            ("bearer-token", "Authorization: Bearer abcdef0123456789XY"),
+            ("url-credentials", "https://user:s3cr3t@example.com/x"),
+            ("password-assign", "password=hunter2"),
+            ("password-assign", "token: abcdef"),
+        ]
+    }
+
+    #[test]
+    fn every_exemplar_detects_and_redacts_cleanly() {
+        for (id, secret) in exemplars() {
+            assert!(
+                detect(secret).contains(&id),
+                "exemplar for {id} not detected: {secret}"
+            );
+            let (redacted, matched) = redact(secret);
+            assert!(matched.contains(&id), "exemplar for {id} not reported");
+            assert!(
+                !redacted.contains(secret),
+                "secret leaked through redact for {id}"
+            );
+            assert!(redacted.contains(REDACTED));
+            // Redaction must be a fixpoint: no detector fires on the output.
+            assert!(
+                detect(&redacted).is_empty(),
+                "redacted output still matches for {id}: {redacted}"
+            );
+        }
+    }
+
+    mod proptests {
+        use super::*;
+        use proptest::prelude::*;
+
+        // Context alphabet without `=`, `:`, `@`, `/` so the context alone
+        // never trips assignment/URL detectors by accident.
+        fn context() -> impl Strategy<Value = String> {
+            prop::collection::vec(prop::char::range('a', 'z'), 0..24)
+                .prop_map(|v| v.into_iter().collect())
+        }
+
+        proptest! {
+            #[test]
+            fn prop_redact_never_leaks(
+                (id, secret) in prop::sample::select(exemplars()),
+                pre in context(),
+                suf in context(),
+            ) {
+                let line = format!("{pre} {secret} {suf}");
+                prop_assert!(
+                    detect(&line).contains(&id),
+                    "exemplar for {id} lost in context"
+                );
+                let (redacted, matched) = redact(&line);
+                prop_assert!(matched.contains(&id), "match not reported for {id}");
+                prop_assert!(!redacted.contains(secret), "secret leaked for {id}");
+                prop_assert!(redacted.contains(REDACTED));
+                prop_assert!(
+                    !detect(&redacted).contains(&id),
+                    "output still matches {id}: {redacted}"
+                );
+            }
+        }
     }
 }

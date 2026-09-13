@@ -9,12 +9,15 @@ use std::path::PathBuf;
     version,
     about = "Find and redact leaked secrets in shell history files"
 )]
+/// Command-line interface definition: `scan`, `clean`, `detectors`.
 pub struct Cli {
     #[command(subcommand)]
+    /// Subcommand to run.
     pub command: Commands,
 }
 
 #[derive(Subcommand, Debug)]
+/// Available subcommands.
 pub enum Commands {
     /// Scan history files and report findings (exit 1 if any).
     /// Secrets are never printed — only redacted previews.
@@ -48,20 +51,33 @@ pub enum Commands {
         /// Remove whole tainted lines instead of redacting secrets.
         #[arg(long = "drop-lines")]
         drop_lines: bool,
+
+        /// Skip the `*.histbak.*` backup (no plaintext copy of the secrets
+        /// is left behind, but the clean cannot be undone).
+        #[arg(long = "no-backup")]
+        no_backup: bool,
     },
+    /// List built-in secret detectors.
     /// List built-in secret detectors.
     Detectors,
 }
 
 #[derive(ValueEnum, Debug, Clone, Copy)]
+/// Shell format override for `--shell`.
 pub enum ShellOpt {
+    /// PowerShell PSReadLine (also covers one-command-per-line formats).
     Powershell,
+    /// bash one-command-per-line format.
     Bash,
+    /// zsh extended-history format.
     Zsh,
 }
 
 #[derive(ValueEnum, Debug, Clone, Copy, PartialEq, Eq)]
+/// `scan` output format.
 pub enum FormatOpt {
+    /// Human-readable lines.
     Text,
+    /// JSON array of findings.
     Json,
 }

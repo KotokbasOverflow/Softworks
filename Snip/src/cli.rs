@@ -9,16 +9,19 @@ use std::path::PathBuf;
     version,
     about = "Shell snippet manager with a secret-redaction gate"
 )]
+/// Command-line interface definition: snippet store, search, exec, sync.
 pub struct Cli {
     /// Database path (default: $SNIP_DB or ~/.snip/snips.db).
     #[arg(long = "db", global = true)]
     pub db: Option<PathBuf>,
 
     #[command(subcommand)]
+    /// Subcommand to run.
     pub command: Commands,
 }
 
 #[derive(Subcommand, Debug)]
+/// Available subcommands.
 pub enum Commands {
     /// Create the database (also created implicitly by add/import).
     Init,
@@ -40,7 +43,10 @@ pub enum Commands {
         command: Vec<String>,
     },
     /// Print the raw command (for copy/eval).
-    Get { name: String },
+    Get {
+        /// Snippet name.
+        name: String,
+    },
     /// List snippets with redacted previews.
     List {
         /// Output JSON.
@@ -49,6 +55,7 @@ pub enum Commands {
     },
     /// Fuzzy-search by name, command, description, tags.
     Search {
+        /// Query string.
         query: String,
         /// Max results.
         #[arg(long = "limit", default_value_t = 10)]
@@ -59,6 +66,7 @@ pub enum Commands {
     },
     /// Run the snippet via your shell (asks unless --yes).
     Exec {
+        /// Snippet name.
         name: String,
         /// Skip confirmation.
         #[arg(long = "yes")]
@@ -69,6 +77,7 @@ pub enum Commands {
     },
     /// Delete a snippet (asks unless --yes).
     Rm {
+        /// Snippet name.
         name: String,
         /// Skip confirmation.
         #[arg(long = "yes")]

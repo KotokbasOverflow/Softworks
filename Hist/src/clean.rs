@@ -6,13 +6,18 @@
 use anyhow::{Context, Result};
 use std::path::{Path, PathBuf};
 
-use crate::history::{HistoryFile, command_text};
+use crate::history::{HistoryFile, split_command};
 use secdetect::redact;
 
+/// Outcome of cleaning one history file.
 pub struct CleanStats {
+    /// Total lines in the file.
     pub lines_total: usize,
+    /// Lines redacted (or dropped with `--drop-lines`).
     pub lines_changed: usize,
-    pub backup_path: PathBuf,
+    /// Where the pre-clean copy was stored (holds original secrets).
+    /// `None` with `--no-backup`.
+    pub backup_path: Option<PathBuf>,
 }
 
 fn backup_path_for(path: &Path) -> PathBuf {
@@ -99,13 +104,18 @@ fn atomic_write(path: &Path, content: &str) -> Result<()> {
 
 /// Redact (or drop) tainted lines of an already-loaded history file.
 /// Writes the file back in its original line format (zsh metadata kept).
-pub fn clean_history(h: &HistoryFile, drop_lines: bool) -> Result<CleanStats> {
-    let backup_path = backup(&h.path)?;
+/// With `no_backup` no `*.histbak.*` copy is made (cannot be undone).
+pub fn clean_history(h: &HistoryFile, drop_lines: bool, no_backup: bool) -> Result<CleanStats> {
+    let backup_path = if no_backup {
+        None
+    } else {
+        Some(backup(&h.path)?)
+    };
 
     let mut changed = 0usize;
     let mut out_lines: Vec<String> = Vec::with_capacity(h.lines.len());
     for raw in &h.lines {
-        let cmd = command_text(h.shell, raw);
+        let (prefix, cmd, suffix) = split_command(h.shell, raw);
         let (redacted_cmd, matched) = redact(cmd);
         if matched.is_empty() {
             out_lines.push(raw.clone());
@@ -115,16 +125,13 @@ pub fn clean_history(h: &HistoryFile, drop_lines: bool) -> Result<CleanStats> {
         if drop_lines {
             continue;
         }
-        // Preserve the original stored format (e.g. zsh `: ts;` prefix).
-        // Slicing is safe: `cmd` is a subslice of `raw`, so the prefix
-        // boundary falls on the subslice start (a valid char boundary).
-        let prefix_len = raw.len().saturating_sub(cmd.len());
-        let prefix = raw.get(..prefix_len).unwrap_or("");
-        out_lines.push(format!("{prefix}{redacted_cmd}"));
+        // Preserve the original stored format (e.g. zsh `: ts;` prefix)
+        // and surrounding whitespace; only the secret itself is replaced.
+        out_lines.push(format!("{prefix}{redacted_cmd}{suffix}"));
     }
 
     let mut content = out_lines.join("\n");
-    if !h.lines.is_empty() {
+    if h.trailing_newline {
         content.push('\n');
     }
     atomic_write(&h.path, &content)?;
@@ -156,16 +163,16 @@ mod tests {
     fn clean_redacts_and_backs_up() {
         let (_dir, path) = write_temp(&["ls", "password=hunter2", "echo ok"]);
         let h = load(Shell::Bash, &path);
-        let stats = clean_history(&h, false).unwrap();
+        let stats = clean_history(&h, false, false).unwrap();
         assert_eq!(stats.lines_total, 3);
         assert_eq!(stats.lines_changed, 1);
-        assert!(stats.backup_path.is_file());
+        assert!(stats.backup_path.as_ref().is_some_and(|f| f.is_file()));
 
         let after = std::fs::read_to_string(&path).unwrap();
         assert!(!after.contains("hunter2"));
         assert!(after.contains("***REDACTED***"));
         // Backup still holds the original (user restores manually if needed).
-        let backup = std::fs::read_to_string(&stats.backup_path).unwrap();
+        let backup = std::fs::read_to_string(stats.backup_path.as_ref().unwrap()).unwrap();
         assert!(backup.contains("hunter2"));
     }
 
@@ -173,7 +180,7 @@ mod tests {
     fn clean_drop_lines_removes_tainted() {
         let (_dir, path) = write_temp(&["ls", "password=hunter2"]);
         let h = load(Shell::Bash, &path);
-        let stats = clean_history(&h, true).unwrap();
+        let stats = clean_history(&h, true, false).unwrap();
         assert_eq!(stats.lines_changed, 1);
         let after = std::fs::read_to_string(&path).unwrap();
         assert!(!after.contains("hunter2"));
@@ -184,7 +191,7 @@ mod tests {
     fn clean_keeps_zsh_metadata() {
         let (_dir, path) = write_temp(&[": 1690000000:0;password=hunter2"]);
         let h = load(Shell::Zsh, &path);
-        clean_history(&h, false).unwrap();
+        clean_history(&h, false, false).unwrap();
         let after = std::fs::read_to_string(&path).unwrap();
         assert!(after.starts_with(": 1690000000:0;"));
         assert!(!after.contains("hunter2"));
@@ -197,5 +204,44 @@ mod tests {
         let b = backup(&path).unwrap();
         assert_ne!(a, b);
         assert!(a.is_file() && b.is_file());
+    }
+
+    #[test]
+    fn clean_preserves_whitespace_and_newline_style() {
+        let dir = tempfile::tempdir().unwrap();
+        // Trailing spaces + no trailing newline must survive the rewrite.
+        let path = dir.path().join("h");
+        std::fs::write(&path, "ls  \n  password=hunter2  ").unwrap();
+        let h = load(Shell::Bash, &path);
+        clean_history(&h, false, false).unwrap();
+        let after = std::fs::read_to_string(&path).unwrap();
+        assert_eq!(after, "ls  \n  ***REDACTED***  ");
+    }
+
+    #[test]
+    fn clean_no_backup_skips_histbak() {
+        let (_dir, path) = write_temp(&["ls", "password=hunter2"]);
+        let h = load(Shell::Bash, &path);
+        let stats = clean_history(&h, false, true).unwrap();
+        assert_eq!(stats.lines_changed, 1);
+        assert!(stats.backup_path.is_none());
+        let after = std::fs::read_to_string(&path).unwrap();
+        assert!(!after.contains("hunter2"));
+    }
+
+    #[test]
+    fn clean_rejects_symlinks() {
+        #[cfg(unix)]
+        {
+            let dir = tempfile::tempdir().unwrap();
+            let real = dir.path().join("real");
+            std::fs::write(&real, "password=hunter2\n").unwrap();
+            let link = dir.path().join("link");
+            std::os::unix::fs::symlink(&real, &link).unwrap();
+            let h = load(Shell::Bash, &link);
+            assert!(clean_history(&h, false, false).is_err());
+            // Target untouched.
+            assert!(std::fs::read_to_string(&real).unwrap().contains("hunter2"));
+        }
     }
 }

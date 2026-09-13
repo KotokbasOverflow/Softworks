@@ -1,3 +1,4 @@
+#![warn(missing_docs)]
 //! `hist` library: secret detectors, history readers, scan and clean.
 //!
 //! The binary (`src/main.rs`) is a thin CLI wrapper; all logic lives here

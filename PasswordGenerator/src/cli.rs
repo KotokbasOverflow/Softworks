@@ -9,6 +9,7 @@ use clap::Parser;
     version,
     about = "Generate secure passwords and Diceware passphrases (CSPRNG)"
 )]
+/// Command-line interface definition and validation.
 pub struct Cli {
     /// Length of the password (required unless --passphrase is used)
     #[arg(short = 'l', long = "length", required_unless_present = "passphrase")]
@@ -101,6 +102,7 @@ pub struct Cli {
 
 impl Cli {
     /// Cross-flag validation that clap's declarative rules cannot express.
+    /// (Also enforces the DoS bounds from `password`/`passphrase`.)
     pub fn validate(&self) -> Result<()> {
         if self.count == 0 {
             bail!("--count must be positive");

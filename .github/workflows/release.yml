@@ -1,0 +1,21 @@
+# Crate releases via release-plz (manual dispatch until CARGO_REGISTRY_TOKEN
+# is configured — then switch `on:` to push on main).
+name: release
+
+on:
+  workflow_dispatch:
+
+jobs:
+  release-plz:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: MarcoIeni/release-plz-action@v0.5
+        with:
+          command: release-pr
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
