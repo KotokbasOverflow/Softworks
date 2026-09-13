@@ -51,10 +51,100 @@ fn decrypt_import(blob: &[u8], identity_path: Option<&std::path::Path>) -> Resul
 fn main() -> Result<()> {
     let cli = Cli::parse();
     let db_path = snip::resolve_db(cli.db.as_ref())?;
-    let conn = store::open(&db_path)?;
+    let create = matches!(cli.command, Commands::Init { .. });
+    let key = match &cli.command {
+        Commands::Init {
+            age_recipient: Some(recipient),
+            ..
+        } => Some(secdetect::age_crypt::AgeKey::from_recipient(recipient)?),
+        Commands::Init {
+            age_passphrase: true,
+            ..
+        } => Some(new_passphrase_key()?),
+        _ => acquire_key(&db_path, cli.age_identity.as_deref())?,
+    };
+    if let Commands::Init { .. } = &cli.command {
+        if db_path.is_file() && !db_is_age_blob(&db_path) && key.is_some() {
+            anyhow::bail!(
+                "database already exists as plaintext: migrate via `export` + `import` into a new encrypted database"
+            );
+        }
+    }
+    let backend = store::open_auto(&db_path, key, create)?;
+    // Always re-encrypt, even when the command fails, so no plaintext
+    // tempfile lingers after an encrypted session.
+    let result = run(&cli.command, backend.conn(), &db_path);
+    backend.close()?;
+    result
+}
 
-    match cli.command {
-        Commands::Init => {
+/// True when the database file exists and starts with the age magic.
+fn db_is_age_blob(db_path: &std::path::Path) -> bool {
+    use std::io::Read as _;
+    let Ok(mut file) = std::fs::File::open(db_path) else {
+        return false;
+    };
+    let mut head = [0u8; 64];
+    let Ok(n) = file.read(&mut head) else {
+        return false;
+    };
+    secdetect::age_crypt::is_age_blob(&head[..n])
+}
+
+/// Prompt for a new database passphrase twice (scrypt `init`).
+fn new_passphrase_key() -> Result<secdetect::age_crypt::AgeKey> {
+    let first = rpassword::prompt_password("new database passphrase: ")
+        .context("cannot read passphrase (not a terminal?)")?;
+    let second = rpassword::prompt_password("confirm database passphrase: ")
+        .context("cannot read passphrase (not a terminal?)")?;
+    if first != second {
+        bail!("passphrases do not match");
+    }
+    if first.len() < 8 {
+        bail!("passphrase must be at least 8 characters");
+    }
+    Ok(secdetect::age_crypt::AgeKey::from_passphrase(&first))
+}
+
+/// Resolve the age key for an encrypted database, if the database needs one:
+/// identity file when `--age-identity` is given, a terminal passphrase
+/// prompt for scrypt databases, else an error pointing at `--age-identity`.
+fn acquire_key(
+    db_path: &std::path::Path,
+    identity: Option<&std::path::Path>,
+) -> Result<Option<secdetect::age_crypt::AgeKey>> {
+    use secdetect::age_crypt as ac;
+    if let Some(path) = identity {
+        return Ok(Some(ac::AgeKey::from_identity_file(path)?));
+    }
+    let Ok(meta) = std::fs::metadata(db_path) else {
+        return Ok(None); // missing: created plain (or encrypted via init)
+    };
+    if !meta.is_file() || meta.len() < ac::AGE_MAGIC.len() as u64 {
+        return Ok(None);
+    }
+    let mut head = vec![0u8; 64];
+    {
+        use std::io::Read as _;
+        let mut file = std::fs::File::open(db_path)?;
+        let n = file.read(&mut head)?;
+        head.truncate(n);
+    }
+    if !ac::is_age_blob(&head) {
+        return Ok(None);
+    }
+    if ac::is_passphrase_blob(&head).unwrap_or(false) {
+        let passphrase = rpassword::prompt_password("age passphrase for database: ")
+            .context("cannot read passphrase (not a terminal?)")?;
+        return Ok(Some(ac::AgeKey::from_passphrase(&passphrase)));
+    }
+    anyhow::bail!("database is age-encrypted: pass --age-identity <file>")
+}
+
+/// Execute one subcommand against an open connection.
+fn run(cmd: &Commands, conn: &rusqlite::Connection, db_path: &std::path::Path) -> Result<()> {
+    match cmd {
+        Commands::Init { .. } => {
             println!("initialized {}", db_path.display());
             Ok(())
         }
@@ -69,17 +159,17 @@ fn main() -> Result<()> {
             if command.trim().is_empty() {
                 bail!("command must not be empty");
             }
-            if !force {
+            if !*force {
                 snip::gate::gate(&command)?;
             }
             let now = store::now_unix();
             store::add(
-                &conn,
+                conn,
                 &Snippet {
                     name: name.clone(),
                     command,
-                    description: desc,
-                    tags,
+                    description: desc.clone(),
+                    tags: tags.clone(),
                     created_at: now,
                     updated_at: now,
                     use_count: 0,
@@ -88,7 +178,7 @@ fn main() -> Result<()> {
             println!("stored {name:?}");
             Ok(())
         }
-        Commands::Get { name } => match store::get(&conn, &name)? {
+        Commands::Get { name } => match store::get(conn, name)? {
             Some(s) => {
                 println!("{}", s.command);
                 Ok(())
@@ -96,8 +186,8 @@ fn main() -> Result<()> {
             None => bail!("no snippet named {name:?}"),
         },
         Commands::List { json } => {
-            let all = store::list(&conn)?;
-            if json {
+            let all = store::list(conn)?;
+            if *json {
                 let redacted: Vec<serde_json::Value> = all
                     .iter()
                     .map(|s| {
@@ -119,9 +209,9 @@ fn main() -> Result<()> {
             Ok(())
         }
         Commands::Search { query, limit, json } => {
-            let all = store::list(&conn)?;
-            let hits = snip::search(&all, &query, limit);
-            if json {
+            let all = store::list(conn)?;
+            let hits = snip::search(&all, query, *limit);
+            if *json {
                 let out: Vec<serde_json::Value> = hits
                     .iter()
                     .map(|(s, score)| {
@@ -141,10 +231,10 @@ fn main() -> Result<()> {
             Ok(())
         }
         Commands::Exec { name, yes, dry_run } => {
-            let Some(s) = store::get(&conn, &name)? else {
+            let Some(s) = store::get(conn, name)? else {
                 bail!("no snippet named {name:?}");
             };
-            if dry_run {
+            if *dry_run {
                 println!("{}", s.command);
                 return Ok(());
             }
@@ -156,12 +246,12 @@ fn main() -> Result<()> {
                     hits.join(",")
                 );
             }
-            if !confirm(&format!("run {:?}?", s.command), yes)? {
+            if !confirm(&format!("run {:?}?", s.command), *yes)? {
                 bail!("aborted");
             }
             let ok = run_shell(&s.command)?;
             if ok {
-                store::bump_use_count(&conn, &name)?;
+                store::bump_use_count(conn, name)?;
             }
             if !ok {
                 bail!("command exited non-zero");
@@ -169,13 +259,13 @@ fn main() -> Result<()> {
             Ok(())
         }
         Commands::Rm { name, yes } => {
-            if store::get(&conn, &name)?.is_none() {
+            if store::get(conn, name)?.is_none() {
                 bail!("no snippet named {name:?}");
             }
-            if !confirm(&format!("delete snippet {name:?}?"), yes)? {
+            if !confirm(&format!("delete snippet {name:?}?"), *yes)? {
                 bail!("aborted");
             }
-            store::remove(&conn, &name)?;
+            store::remove(conn, name)?;
             println!("removed {name:?}");
             Ok(())
         }
@@ -183,7 +273,7 @@ fn main() -> Result<()> {
             file,
             age_recipient,
         } => {
-            let all = store::list(&conn)?;
+            let all = store::list(conn)?;
             let risky = all
                 .iter()
                 .filter(|s| !secdetect::detect(&s.command).is_empty())
@@ -195,10 +285,10 @@ fn main() -> Result<()> {
             }
             let json = serde_json::to_string_pretty(&all)?;
             if let Some(recipient) = age_recipient {
-                let blob = secdetect::age_crypt::encrypt_to_recipient(json.as_bytes(), &recipient)?;
+                let blob = secdetect::age_crypt::encrypt_to_recipient(json.as_bytes(), recipient)?;
                 match file {
                     Some(p) => {
-                        std::fs::write(&p, &blob)
+                        std::fs::write(p, &blob)
                             .with_context(|| format!("cannot write {}", p.display()))?;
                         println!(
                             "exported {} snippet(s), age-encrypted, to {}",
@@ -218,7 +308,7 @@ fn main() -> Result<()> {
             }
             match file {
                 Some(p) => {
-                    std::fs::write(&p, &json)
+                    std::fs::write(p, &json)
                         .with_context(|| format!("cannot write {}", p.display()))?;
                     println!("exported {} snippet(s) to {}", all.len(), p.display());
                 }
@@ -236,7 +326,7 @@ fn main() -> Result<()> {
                 Some(p) => {
                     // DoS guard: refuse multi-hundred-MB "exports".
                     const MAX_IMPORT_BYTES: u64 = 10 * 1024 * 1024;
-                    if let Ok(meta) = std::fs::metadata(&p) {
+                    if let Ok(meta) = std::fs::metadata(p) {
                         if meta.len() > MAX_IMPORT_BYTES {
                             bail!(
                                 "import file {} is {} bytes (limit {MAX_IMPORT_BYTES})",
@@ -245,7 +335,7 @@ fn main() -> Result<()> {
                             );
                         }
                     }
-                    std::fs::read(&p).with_context(|| format!("cannot read {}", p.display()))?
+                    std::fs::read(p).with_context(|| format!("cannot read {}", p.display()))?
                 }
                 None => {
                     let mut buf = Vec::new();
@@ -276,18 +366,18 @@ fn main() -> Result<()> {
             }
             let (mut added, mut skipped) = (0usize, 0usize);
             for item in items {
-                if !force {
+                if !*force {
                     snip::gate::gate(&item.command)?;
                 }
-                if store::get(&conn, &item.name)?.is_some() {
-                    if overwrite {
-                        store::remove(&conn, &item.name)?;
+                if store::get(conn, &item.name)?.is_some() {
+                    if *overwrite {
+                        store::remove(conn, &item.name)?;
                     } else {
                         skipped += 1;
                         continue;
                     }
                 }
-                store::add(&conn, &item)?;
+                store::add(conn, &item)?;
                 added += 1;
             }
             println!("imported {added}, skipped {skipped}");

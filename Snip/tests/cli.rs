@@ -272,3 +272,87 @@ fn import_encrypted_without_identity_fails_cleanly() {
         .failure()
         .stderr(predicate::str::contains("--age-identity"));
 }
+
+#[test]
+fn encrypted_db_full_session_flow() {
+    let (recipient, identity) = keypair();
+    let (_dir, db) = db_dir();
+    let id_file = write_identity(&_dir, &identity);
+
+    // Encrypted init: the file is an age blob from the start.
+    bin()
+        .args(["--db"])
+        .arg(&db)
+        .args(["init", "--age-recipient"])
+        .arg(&recipient)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("initialized"));
+    let blob = std::fs::read(&db).unwrap();
+    assert!(secdetect::age_crypt::is_age_blob(&blob));
+
+    // add/get/list work with the identity file...
+    bin()
+        .args(["--db"])
+        .arg(&db)
+        .args(["--age-identity"])
+        .arg(&id_file)
+        .args(["add", "deploy", "--", "ssh", "prod", "uptime"])
+        .assert()
+        .success();
+    bin()
+        .args(["--db"])
+        .arg(&db)
+        .args(["--age-identity"])
+        .arg(&id_file)
+        .args(["get", "deploy"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("ssh prod uptime"));
+
+    // ...stay encrypted on disk with no plaintext residue...
+    let blob = std::fs::read(&db).unwrap();
+    assert!(secdetect::age_crypt::is_age_blob(&blob));
+    assert!(!blob.windows(4).any(|w| w == b"prod"));
+
+    // ...and refuse to open without the key.
+    bin()
+        .args(["--db"])
+        .arg(&db)
+        .args(["get", "deploy"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("--age-identity"));
+
+    // Wrong identity fails closed too.
+    let (_, other_identity) = keypair();
+    let bad_id = write_identity(&_dir, &other_identity);
+    bin()
+        .args(["--db"])
+        .arg(&db)
+        .args(["--age-identity"])
+        .arg(&bad_id)
+        .args(["get", "deploy"])
+        .assert()
+        .failure();
+}
+
+#[test]
+fn encrypted_init_refuses_existing_plaintext() {
+    let (recipient, _) = keypair();
+    let (_dir, db) = db_dir();
+    bin()
+        .args(["--db"])
+        .arg(&db)
+        .args(["add", "x", "--", "echo", "hi"])
+        .assert()
+        .success();
+    bin()
+        .args(["--db"])
+        .arg(&db)
+        .args(["init", "--age-recipient"])
+        .arg(&recipient)
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("export"));
+}

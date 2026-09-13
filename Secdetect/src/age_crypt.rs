@@ -83,6 +83,99 @@ pub fn read_identity_file(path: &Path) -> Result<age::x25519::Identity> {
         .map_err(|e| anyhow::anyhow!("invalid age identity in {}: {e}", path.display()))
 }
 
+/// An age key usable for both directions: holds an X25519 identity (with the
+/// recipient derived from it) or a passphrase (scrypt both ways).
+/// Opaque on purpose: dependents never touch `age` types directly.
+pub struct AgeKey {
+    recipient: String,
+    identity: Option<String>,
+    passphrase: Option<SecretString>,
+}
+
+impl AgeKey {
+    /// Build from an X25519 identity file (`AGE-SECRET-KEY-...`).
+    pub fn from_identity_file(path: &Path) -> Result<Self> {
+        let identity = read_identity_file(path)?;
+        Self::from_identity(&identity)
+    }
+
+    /// Build from an `AGE-SECRET-KEY-...` string (prefer files: strings
+    /// cannot be wiped from memory).
+    pub fn from_identity_str(identity: &str) -> Result<Self> {
+        let identity: age::x25519::Identity = identity
+            .trim()
+            .parse()
+            .map_err(|e| anyhow::anyhow!("invalid age identity: {e}"))?;
+        Self::from_identity(&identity)
+    }
+
+    fn from_identity(identity: &age::x25519::Identity) -> Result<Self> {
+        let recipient = identity.to_public().to_string();
+        let secret = identity.to_string();
+        Ok(Self {
+            recipient,
+            identity: Some(secret.expose_secret().to_owned()),
+            passphrase: None,
+        })
+    }
+
+    /// Build from an `age1...` recipient string (encrypt-only).
+    pub fn from_recipient(recipient: &str) -> Result<Self> {
+        // Validate eagerly so `init` fails before creating anything.
+        let parsed: age::x25519::Recipient = recipient
+            .parse()
+            .map_err(|e| anyhow::anyhow!("invalid age recipient {recipient:?}: {e}"))?;
+        Ok(Self {
+            recipient: parsed.to_string(),
+            identity: None,
+            passphrase: None,
+        })
+    }
+
+    /// Build from a passphrase (scrypt both ways).
+    pub fn from_passphrase(passphrase: &str) -> Self {
+        Self {
+            recipient: String::new(),
+            identity: None,
+            passphrase: Some(SecretString::new(passphrase.to_owned().into_boxed_str())),
+        }
+    }
+
+    /// The recipient this key encrypts to (for display/diagnostics).
+    /// Empty for passphrase keys until first encryption.
+    pub fn recipient(&self) -> &str {
+        &self.recipient
+    }
+
+    /// True when this key can decrypt without further input.
+    pub fn can_decrypt(&self) -> bool {
+        self.identity.is_some() || self.passphrase.is_some()
+    }
+
+    /// Encrypt `plaintext` to this key's recipient.
+    pub fn encrypt(&self, plaintext: &[u8]) -> Result<Vec<u8>> {
+        if let Some(passphrase) = &self.passphrase {
+            let recipient = age::scrypt::Recipient::new(passphrase.clone());
+            return age::encrypt(&recipient, plaintext)
+                .map_err(|e| anyhow::anyhow!("age encryption failed: {e}"));
+        }
+        encrypt_to_recipient(plaintext, &self.recipient)
+    }
+
+    /// Decrypt `blob` with this key's identity or passphrase.
+    pub fn decrypt(&self, blob: &[u8]) -> Result<Vec<u8>> {
+        if let Some(identity) = &self.identity {
+            return decrypt_with_identity(blob, identity);
+        }
+        if let Some(passphrase) = &self.passphrase {
+            let identity = age::scrypt::Identity::new(passphrase.clone());
+            return age::decrypt(&identity, blob)
+                .map_err(|e| anyhow::anyhow!("age decryption failed (wrong passphrase?): {e}"));
+        }
+        anyhow::bail!("key has no identity or passphrase to decrypt with")
+    }
+}
+
 /// Decrypt an age-encrypted import blob.
 /// An identity file wins when given; otherwise scrypt (passphrase) blobs
 /// need `passphrase`, and key-encrypted blobs without an identity file are
@@ -192,5 +285,47 @@ mod tests {
             assert!(read_identity_file(&path).is_err());
         }
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn age_key_file_roundtrip() {
+        let dir = std::env::temp_dir().join(format!(
+            "secdetect-key-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_nanos())
+                .unwrap_or(0)
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("key.txt");
+        let (_, identity) = keypair();
+        std::fs::write(&path, format!("{identity}\n")).unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).unwrap();
+        }
+        let key = AgeKey::from_identity_file(&path).unwrap();
+        assert!(key.can_decrypt());
+        assert!(key.recipient().starts_with("age1"));
+        let blob = key.encrypt(b"db-bytes").unwrap();
+        assert_eq!(key.decrypt(&blob).unwrap(), b"db-bytes");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn age_key_passphrase_roundtrip_and_recipient_only() {
+        let key = AgeKey::from_passphrase("s3cret phrase");
+        assert!(key.can_decrypt());
+        let blob = key.encrypt(b"db-bytes").unwrap();
+        assert_eq!(key.decrypt(&blob).unwrap(), b"db-bytes");
+        assert!(AgeKey::from_passphrase("wrong").decrypt(&blob).is_err());
+
+        let (recipient, _) = keypair();
+        let enc_only = AgeKey::from_recipient(&recipient).unwrap();
+        assert!(!enc_only.can_decrypt());
+        assert!(enc_only.decrypt(&blob).is_err());
+        assert!(AgeKey::from_recipient("garbage").is_err());
     }
 }

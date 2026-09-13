@@ -16,6 +16,8 @@ versioning follows [SemVer](https://semver.org/).
   (encrypted backups) and `snip` (encrypted export/import) — recipient and
   passphrase roundtrips, blob auto-detection, permission-checked identity
   files (`age` + `anyhow` dependencies).
+- `AgeKey`: encrypt/decrypt keypair abstraction (identity file with
+  permission checks, recipient-only, passphrase) for encrypted stores.
 - `#![warn(missing_docs)]`.
 
 ## [0.1.0] — 2026-09-13

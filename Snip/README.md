@@ -36,6 +36,22 @@ snip import --force --file snips.json
 snip rm prune --yes
 ```
 
+## Encrypted database (age)
+
+```powershell
+snip init --age-recipient age1...   # new encrypted DB (X25519)
+snip init --age-passphrase          # new encrypted DB (scrypt passphrase)
+snip --age-identity key.txt add api -- curl -H "Authorization: Bearer ..."
+snip --age-identity key.txt list
+```
+
+The database file stays an age blob at rest; each session decrypts to a
+`0600` tempfile and re-encrypts atomically on close (even on command
+failure). Concurrent sessions are refused via a pid-tagged lock file
+(stale Linux locks from dead pids are cleared; elsewhere remove it
+manually). Migrate a plaintext DB with `export` + `import --age-identity`
+into a fresh encrypted one. Lost identity/passphrase = lost snippets.
+
 ## Safety notes
 
 - The gate is best-effort (same conservative patterns as `hist`). Absence of a refusal is not proof the command is safe.

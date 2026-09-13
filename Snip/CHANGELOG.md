@@ -16,7 +16,13 @@ versioning follows [SemVer](https://semver.org/).
   `import` auto-detects age blobs and decrypts via `--age-identity`
   (identity files must be `0600` on unix) or a terminal passphrase prompt
   for scrypt files.
+- Age-encrypted live databases: `init --age-recipient age1...` /
+  `init --age-passphrase`, auto-detection on open, `--age-identity` (or a
+  terminal passphrase prompt for scrypt DBs), per-session `0600` tempfile
+  with atomic re-encrypt on close, pid-tagged session lock. Plaintext DBs
+  reject keys loudly (migrate via `export` + `import`).
 - `#![warn(missing_docs)]`; `cargo doc` added to CI.
+
 ## [0.1.0] — 2026-09-13
 
 - Initial release: `init`, `add`, `get`, `list`, `search`, `exec`, `rm`,

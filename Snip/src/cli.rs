@@ -15,6 +15,11 @@ pub struct Cli {
     #[arg(long = "db", global = true)]
     pub db: Option<PathBuf>,
 
+    /// Identity file (`AGE-SECRET-KEY-...`) for age-encrypted databases
+    /// and imports. Passphrase-encrypted inputs prompt on the terminal.
+    #[arg(long = "age-identity", global = true)]
+    pub age_identity: Option<PathBuf>,
+
     #[command(subcommand)]
     /// Subcommand to run.
     pub command: Commands,
@@ -24,7 +29,16 @@ pub struct Cli {
 /// Available subcommands.
 pub enum Commands {
     /// Create the database (also created implicitly by add/import).
-    Init,
+    /// With `--age-recipient` / `--age-passphrase`, creates an
+    /// age-encrypted database.
+    Init {
+        /// Encrypt a new database to this age recipient (`age1...`).
+        #[arg(long = "age-recipient", conflicts_with = "age_passphrase")]
+        age_recipient: Option<String>,
+        /// Encrypt a new database with a terminal passphrase (scrypt).
+        #[arg(long = "age-passphrase", conflicts_with = "age_recipient")]
+        age_passphrase: bool,
+    },
     /// Store a snippet. Refuses commands with secrets unless --force.
     Add {
         /// Snippet name.

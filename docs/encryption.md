@@ -1,7 +1,7 @@
 # RFC: encryption at rest for Softworks
 
-Status: **v1 implemented** (opt-in flags below). Encrypted live DB stays
-deferred to v2. Goal: close the main residual risk —
+Status: **v1 + v2 implemented** (opt-in flags below). Remaining: OS
+keychain for key storage (deferred, on user demand). Goal: close the main residual risk —
 plaintext `snip` databases, `hist` backups (`*.histbak.*`) and `snip`
 exports. All encryption features are **opt-in**; plaintext stays the default
 so scripts and existing flows keep working.
@@ -16,7 +16,14 @@ Implemented:
   prompt for scrypt files; key-encrypted blobs without an identity fail
   closed with a pointer to `--age-identity`.
 - Shared primitives live in `secdetect::age_crypt` (roundtrip + wrong-key +
-  no-residue + permission tests).
+  no-residue + permission tests), plus the `AgeKey` abstraction.
+- Encrypted live DB (v2, implemented): `snip init --age-recipient age1...`
+  or `init --age-passphrase`; auto-detection on open; global
+  `--age-identity` (terminal passphrase prompt for scrypt DBs); per-session
+  `0600` tempfile with atomic re-encrypt on close even on command failure
+  (`Drop` best-effort net); pid-tagged `<db>.lock` against concurrent
+  sessions (stale Linux locks cleared, elsewhere manual removal);
+  plaintext DBs reject keys loudly — migrate via `export` + `import`.
 
 ## Decision: `age` as the default primitive
 
