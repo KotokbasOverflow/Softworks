@@ -15,5 +15,8 @@
 # OS
 .DS_Store
 Thumbs.db
+# Secrets
+.env
+.env.*
 # rust-analyzer flycheck
 flycheck*

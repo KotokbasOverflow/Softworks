@@ -93,7 +93,13 @@ fn restrict_backup_perms(path: &Path) {
 }
 
 #[cfg(not(unix))]
-fn restrict_backup_perms(_path: &Path) {}
+fn restrict_backup_perms(_path: &Path) {
+    // Windows DACLs require the `windows-sys` crate to restrict beyond
+    // owner-only.  Files created here inherit the parent directory's
+    // default DACL (typically owner-RW only on standard user profiles).
+    // If the workspace is on a shared drive the operator should ensure
+    // the directory ACL is restrictive.  Documented in SECURITY.md.
+}
 
 /// Atomically replace `path` with `content` (temp file + rename in the
 /// same directory, so a crash cannot leave a half-written history).

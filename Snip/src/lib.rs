@@ -47,11 +47,7 @@ pub fn search<'a>(snips: &'a [Snippet], query: &str, limit: usize) -> Vec<(&'a S
             let desc = fuzzy::fuzzy_score(query, &s.description);
             let best = [name, tags, cmd, desc].into_iter().flatten().max()?;
             // Name matches outrank everything: small bump, ties broken by use.
-            let bump = if fuzzy::fuzzy_score(query, &s.name).is_some() {
-                1000
-            } else {
-                0
-            };
+            let bump = if name.is_some() { 1000 } else { 0 };
             Some((s, best + bump + s.use_count))
         })
         .collect();

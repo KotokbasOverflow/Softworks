@@ -35,7 +35,7 @@ Implemented:
   for key storage, not for bulk data. Deferred: three platform backends,
   headless-CI pain, big scope. Revisit if users ask for unlock-without-prompt.
 
-## Scope v1 (opt-in flags only)
+## Scope v1 (completed)
 
 1. `hist clean --backup-age-recipient <age-recipient>`: the `*.histbak.*`
    copy is written encrypted (`*.histbak.age`); the plaintext original is
@@ -45,10 +45,12 @@ Implemented:
 3. `snip import --age-identity <file>`: accept an age-encrypted export
    (auto-detected: age magic header → decrypt with passphrase prompt or
    `--age-identity` key file).
-4. `snip --db` encrypted store: **deferred to v2**. Wrapping SQLite in age
-   means decrypt-to-tempfile on open + re-encrypt on close (tempfile
-   handling, crash-consistency, `exec`/`search` performance). Needs its own
-   RFC once 1–3 prove the UX.
+
+## Scope v2 (completed)
+
+4. `snip --db` encrypted store: decrypt-to-tempfile on open, re-encrypt on
+   close (`Drop` best-effort), pid-tagged lock, plaintext+key reject.
+   Implemented in `snip/src/store.rs` (`EncryptedStore`).
 
 ## Key management & UX rules
 

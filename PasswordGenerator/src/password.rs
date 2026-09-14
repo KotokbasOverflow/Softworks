@@ -77,16 +77,23 @@ pub fn generate_password(
     };
 
     let mut charset: Vec<char> = Vec::new();
+    // Track where each set starts so we can sample one from each without
+    // allocating separate Vecs — the combined charset is the single source.
+    let mut set_offsets: Vec<usize> = Vec::new();
     if use_lower {
+        set_offsets.push(charset.len());
         charset.extend(lower_set.chars());
     }
     if use_upper {
+        set_offsets.push(charset.len());
         charset.extend(upper_set.chars());
     }
     if use_digits {
+        set_offsets.push(charset.len());
         charset.extend(digits_set.chars());
     }
     if use_symbols {
+        set_offsets.push(charset.len());
         charset.extend(symbols_set.chars());
     }
     if charset.is_empty() {
@@ -97,26 +104,13 @@ pub fn generate_password(
     let mut password: Vec<char> = Vec::with_capacity(length);
 
     // Guarantee at least one char from each selected set when length allows.
-    // If length < number of sets, the guarantee is impossible — document and
-    // fall back to pure random sampling.
-    let mut sets_used: Vec<Vec<char>> = Vec::new();
-    if use_lower {
-        sets_used.push(lower_set.chars().collect());
-    }
-    if use_upper {
-        sets_used.push(upper_set.chars().collect());
-    }
-    if use_digits {
-        sets_used.push(digits_set.chars().collect());
-    }
-    if use_symbols {
-        sets_used.push(symbols_set.chars().collect());
-    }
-
-    if length >= sets_used.len() {
-        for set in &sets_used {
-            let idx = rng.random_range(0..set.len());
-            password.push(set[idx]);
+    // If length < number of sets, the guarantee is impossible — fall back to
+    // pure random sampling over the combined charset.
+    if length >= set_offsets.len() {
+        for (i, &offset) in set_offsets.iter().enumerate() {
+            let next = set_offsets.get(i + 1).copied().unwrap_or(charset.len());
+            let idx = rng.random_range(offset..next);
+            password.push(charset[idx]);
         }
     }
 

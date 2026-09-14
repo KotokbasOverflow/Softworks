@@ -97,10 +97,15 @@ fn restrict_0600(path: &Path) {
 }
 
 #[cfg(not(unix))]
-fn restrict_0600(_path: &Path) {}
+fn restrict_0600(_path: &Path) {
+    // Same Windows caveat as hist/clean.rs — DACLs need `windows-sys`.
+    // Standard user profiles default to owner-only; shared drives should
+    // be checked by the operator.
+}
 
 /// Atomically replace `path` with `bytes` (sibling temp file + rename).
 fn atomic_write_bytes(path: &Path, bytes: &[u8]) -> Result<()> {
+    use std::io::Write as _;
     let nanos = now_nanos();
     let tmp_name = format!(
         ".{}.tmp.{}.{}.snipwrite",
@@ -112,9 +117,19 @@ fn atomic_write_bytes(path: &Path, bytes: &[u8]) -> Result<()> {
     );
     let tmp_path = path.with_file_name(tmp_name);
     let result = (|| -> Result<()> {
-        std::fs::write(&tmp_path, bytes)
-            .with_context(|| format!("cannot write {}", tmp_path.display()))?;
+        let mut f = std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&tmp_path)
+            .with_context(|| format!("cannot create {}", tmp_path.display()))?;
         restrict_0600(&tmp_path);
+        f.write_all(bytes)
+            .with_context(|| format!("cannot write {}", tmp_path.display()))?;
+        f.flush()
+            .with_context(|| format!("cannot flush {}", tmp_path.display()))?;
+        f.sync_all()
+            .with_context(|| format!("cannot fsync {}", tmp_path.display()))?;
+        drop(f);
         std::fs::rename(&tmp_path, path)
             .with_context(|| format!("cannot replace {}", path.display()))?;
         Ok(())
